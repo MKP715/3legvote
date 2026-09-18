@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Run A.A. service elections by the Third Legacy Procedure — multiple positions, in-person and virtual voting, exact calculations." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#1d4ed8" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <title>Third Legacy Vote</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a flash.
+      try {
+        var t = localStorage.getItem('tlv-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        if (localStorage.getItem('tlv-large-text') === '1') document.documentElement.classList.add('large-text');
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="./assets/index-DldaMbT1.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D3e3MvkR.css">
+  <link rel="manifest" href="./manifest.webmanifest"></head>
+  <body>
+    <div id="root"></div>
+    <noscript>This app needs JavaScript enabled.</noscript>
+  </body>
+</html>

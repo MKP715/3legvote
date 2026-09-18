@@ -1,0 +1,27 @@
+name: Test and build
+
+# GitHub Pages serves the main branch root ("Deploy from a branch"), so the built site is
+# committed by `npm run build`. This workflow checks that tests pass and the app builds.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build:dist
+      - name: Check the published site is present
+        run: test -f index.html && test -f .nojekyll && ls assets/*.js >/dev/null

@@ -1,0 +1,484 @@
+/* Styles for roll call, teller devices, live projector controls, stepper, guide flowchart and printables. */
+.center {
+  justify-content: center;
+}
+button.mini,
+.mini {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.8rem;
+  width: auto;
+  margin: 0;
+}
+.ok-box {
+  border-left: 4px solid var(--ok);
+  background: var(--ok-bg);
+  padding: 0.6rem 0.9rem;
+  border-radius: 4px;
+  margin: 0.8rem 0;
+}
+.voters-bar .ok-box,
+.voters-bar .warn-box {
+  flex-basis: 100%;
+  margin: 0.2rem 0 0;
+}
+.skip-link {
+  position: absolute;
+  left: -999px;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 2000;
+  background: var(--pico-background-color);
+  padding: 0.5rem 1rem;
+}
+.icon-btn {
+  padding: 0.25rem 0.6rem;
+  margin: 0;
+  font-size: 0.95rem;
+  background: transparent;
+  color: var(--pico-muted-color);
+  border: 1px solid var(--pico-muted-border-color);
+  min-width: 2.4rem;
+  font-weight: 700;
+}
+.icon-btn:hover {
+  color: var(--pico-primary);
+  border-color: var(--pico-primary);
+}
+.icon-btn.on {
+  background: var(--pico-primary);
+  color: #fff;
+}
+.brand img {
+  vertical-align: -5px;
+  border-radius: 5px;
+}
+.update-banner {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 1rem;
+  z-index: 1500;
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.25);
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  max-width: calc(100vw - 2rem);
+  flex-wrap: wrap;
+}
+.update-banner button {
+  margin: 0;
+  width: auto;
+  padding: 0.3rem 0.8rem;
+}
+
+/* stepper */
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0.5rem;
+}
+.stepper .step {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid var(--pico-muted-border-color);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  min-width: 5.5rem;
+}
+.stepper .step-sub {
+  font-size: 0.72rem;
+  color: var(--pico-muted-color);
+}
+.stepper .step-done {
+  background: var(--ok-bg);
+  border-color: var(--ok);
+}
+.stepper .step-current {
+  background: var(--info-bg);
+  border: 2px solid var(--info);
+  font-weight: 700;
+}
+.stepper .step-skipped {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+/* ballot colours */
+.ballot-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-left: 0.8rem;
+  color: var(--pico-muted-color);
+}
+.swatches .ballot-color {
+  margin-left: 0;
+  margin-right: 0.6rem;
+}
+.swatch {
+  display: inline-block;
+  width: 0.85rem;
+  height: 1.1rem;
+  border-radius: 1px;
+  border: 1px solid rgb(0 0 0 / 0.25);
+  box-shadow: 1px 1px 0 rgb(0 0 0 / 0.25);
+  transform: rotate(-6deg);
+  vertical-align: middle;
+}
+.swatch.big {
+  width: 1.7rem;
+  height: 2.2rem;
+  margin-right: 0.6rem;
+}
+.voting-status {
+  margin-bottom: 0.8rem;
+}
+.district-input {
+  max-width: 11rem;
+}
+.cand-district {
+  font-weight: 400;
+  color: var(--pico-muted-color);
+}
+
+/* timer */
+.timer-face {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.3rem 0.9rem;
+  border-radius: 8px;
+  border: 2px solid var(--pico-muted-border-color);
+  margin: 0.5rem 0;
+}
+.timer-clock {
+  font-size: 2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.timer-label {
+  color: var(--pico-muted-color);
+}
+.timer-warn {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+.timer-done {
+  border-color: var(--bad);
+  background: var(--bad-bg);
+}
+.timer-large .timer-clock {
+  font-size: clamp(3rem, 8vw, 6rem);
+}
+.timer-large .timer-label {
+  font-size: 1.5rem;
+}
+
+/* display extras */
+.display-message {
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  font-weight: 800;
+  text-align: center;
+  padding: 1rem;
+  margin: 1rem 0;
+  border: 3px dashed var(--pico-primary);
+  border-radius: 12px;
+}
+.display-status {
+  display: flex;
+  align-items: center;
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+  font-weight: 800;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  margin-top: 1rem;
+}
+.display-status.status-voting {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.display-status.status-counting {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.display-spin {
+  font-size: clamp(3rem, 9vw, 6rem);
+}
+.display-candidates {
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+  columns: 2;
+}
+.display .timer-face {
+  display: flex;
+  justify-content: center;
+}
+
+/* teller panel & poll import */
+.qr {
+  background: #fff;
+  padding: 6px;
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+.scanner {
+  margin-top: 0.6rem;
+}
+.scanner-video {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 8px;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.poll-import {
+  border-top: 1px solid var(--pico-muted-border-color);
+  padding-top: 0.8rem;
+  margin-top: 0.8rem;
+}
+.poll-preview {
+  margin-top: 0.6rem;
+}
+.panel-lite h6 {
+  margin: 0.6rem 0 0.3rem;
+}
+
+/* roll call */
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 8px;
+  min-width: 8rem;
+}
+.stat span {
+  font-size: 0.8rem;
+  color: var(--pico-muted-color);
+}
+.stat strong {
+  font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.roll-add {
+  display: grid;
+  grid-template-columns: 2fr 1.4fr 1.4fr 1fr 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.roll-add > * {
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .roll-add {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.roll-table td,
+.roll-table th {
+  vertical-align: middle;
+}
+.roll-table select {
+  margin: 0;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  min-width: 9rem;
+}
+.checkin {
+  margin: 0;
+  width: 7rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.85rem;
+}
+.row-present td {
+  background: color-mix(in srgb, var(--ok-bg) 40%, transparent);
+}
+
+/* teller phone page */
+.teller {
+  padding-top: 1rem;
+  padding-bottom: 3rem;
+}
+.teller-head {
+  margin-bottom: 1rem;
+}
+.teller-head .ballot-color {
+  margin-left: 0;
+}
+.teller-grid {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.8rem 0;
+}
+.teller-grid .tally-btn {
+  grid-template-columns: 1fr auto;
+  padding: 1.1rem 1.2rem;
+  font-size: 1.2rem;
+}
+.finish {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+/* guide flowchart */
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1rem 0 2rem;
+}
+.flow-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  align-items: center;
+  padding: 0.6rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 8px;
+}
+.flow-box {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.flow-ballot {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.flow-q {
+  border: 2px solid var(--pico-muted-border-color);
+  font-weight: 500;
+}
+.flow-motion {
+  background: var(--warn-bg);
+  color: var(--warn);
+  flex: 1 1 18rem;
+}
+.flow-arrow {
+  color: var(--pico-muted-color);
+}
+.flow-yes,
+.flow-no {
+  font-size: 0.9rem;
+}
+.flow-no {
+  flex-basis: 100%;
+}
+.flow-split {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.flow-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0 0.4rem;
+  border-radius: 3px;
+  margin-right: 0.3rem;
+}
+.flow-tag.yes {
+  background: var(--ok);
+  color: #fff;
+}
+.flow-tag.no {
+  background: var(--bad);
+  color: #fff;
+}
+.guide blockquote footer {
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+}
+
+/* report */
+.meta-item {
+  display: inline-block;
+  margin-right: 1.2rem;
+}
+.report-attendance summary {
+  font-weight: 600;
+}
+
+/* printable sheets (also visible on screen as a preview) */
+.print-sheet {
+  margin-top: 1rem;
+}
+.tally-sheet {
+  break-after: page;
+  margin-bottom: 2rem;
+}
+.tally-sheet h2 {
+  font-size: 1.2rem;
+}
+.tally-name {
+  width: 30%;
+  font-weight: 600;
+}
+.tally-boxes {
+  white-space: nowrap;
+}
+.tally-box {
+  display: inline-block;
+  width: 2.2rem;
+  height: 1.6rem;
+  border: 1px solid currentColor;
+  margin-right: 0.25rem;
+  opacity: 0.6;
+}
+.tally-total {
+  width: 5rem;
+  border-left: 2px solid currentColor;
+}
+.board-sign h1 {
+  font-size: 2.6rem;
+}
+.board-sign table {
+  font-size: 1.5rem;
+}
+.board-sign td {
+  height: 3.2rem;
+  border: 1px solid currentColor;
+}
+.slip-color {
+  font-weight: 800;
+}
+@media print {
+  .tally-sheet,
+  .board-sign {
+    color: #000;
+  }
+  .update-banner {
+    display: none !important;
+  }
+}
+
+/* Small screens: wide tables scroll inside themselves instead of widening the page. */
+@media (max-width: 700px) {
+  main table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .positions-table .mini-group button {
+    padding: 0.25rem 0.45rem;
+  }
+}
