@@ -214,7 +214,10 @@ export function rollFromRows(rows: Record<string, string>[], roles: VoterRole[],
   let skipped = 0;
 
   for (const r of rows) {
-    const name = pick(r, COLUMN_KEYS.name);
+    // Many registrar exports have "First name" and "Last name" columns instead of one name.
+    const first = pick(r, ['first name', 'firstname', 'given name', 'nombre de pila']);
+    const last = pick(r, ['last name', 'lastname', 'surname', 'apellido', 'initial', 'last initial']);
+    const name = [first, last].filter(Boolean).join(' ').trim() || pick(r, COLUMN_KEYS.name);
     if (!name) {
       skipped++;
       continue;

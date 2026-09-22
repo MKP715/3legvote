@@ -138,6 +138,20 @@ describe('voter eligibility', () => {
     expect(el.eligible.map((x) => `${x.name}/${x.roleId}`).sort()).toEqual(['Chris B./altgsr', 'Pat M./dcm']);
   });
 
+  it('joins separate first and last name columns', () => {
+    let n = 0;
+    const out = rollFromRows(
+      [
+        { 'First Name': 'Ann', 'Last Name': 'B.', Role: 'GSR', 'Home Group': 'Hope' },
+        { 'First name': 'Bob', 'Last initial': 'C.', Role: 'Officer' },
+      ],
+      roles,
+      () => `id${n++}`,
+    );
+    expect(out.voters.map((v) => v.name)).toEqual(['Ann B.', 'Bob C.']);
+    expect(out.voters[1].roleId).toBe('officer');
+  });
+
   it('flags people listed twice in an imported file', () => {
     let n = 0;
     const out = rollFromRows([{ Name: 'Ann B.' }, { Name: 'ann b.' }], roles, () => `id${n++}`);

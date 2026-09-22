@@ -20,6 +20,7 @@ export function PrintBallots() {
   const [count, setCount] = useState<number | null>(null);
   const [ballotNo, setBallotNo] = useState<number | null>(null);
   const [showNames, setShowNames] = useState(false);
+  const [copies, setCopies] = useState<number | null>(2);
   if (!a) return <NotFound what="assembly" />;
   const position = a.positions.find((p) => p.id === pid);
   const state = position ? computePosition(position, a.settings) : null;
@@ -28,6 +29,8 @@ export function PrintBallots() {
   const n = Math.min(1000, Math.max(1, count ?? (voters.inPerson > 0 ? voters.inPerson : 40)));
   const rounded = Math.max(8, Math.ceil(n / 8) * 8);
   const color = ballotNo ? ballotColor(a.ballotColors, ballotNo) : null;
+  // Enough boxes (five ballots each) for the voters present, within one line.
+  const tallyBoxes = Math.min(20, Math.max(8, Math.ceil((voters.inPerson + voters.virtual || 60) / 5 / 2)));
 
   return (
     <>
@@ -41,14 +44,14 @@ export function PrintBallots() {
       </nav>
       <article className="no-print">
         <header>
-          <div role="group">
-            <button className={kind === 'slips' ? '' : 'outline secondary'} onClick={() => setKind('slips')}>
+          <div role="group" aria-label="What to print">
+            <button className={kind === 'slips' ? '' : 'outline secondary'} aria-pressed={kind === 'slips'} onClick={() => setKind('slips')}>
               Ballot slips
             </button>
-            <button className={kind === 'tally' ? '' : 'outline secondary'} onClick={() => setKind('tally')}>
+            <button className={kind === 'tally' ? '' : 'outline secondary'} aria-pressed={kind === 'tally'} onClick={() => setKind('tally')}>
               Teller tally sheet
             </button>
-            <button className={kind === 'board' ? '' : 'outline secondary'} onClick={() => setKind('board')}>
+            <button className={kind === 'board' ? '' : 'outline secondary'} aria-pressed={kind === 'board'} onClick={() => setKind('board')}>
               Candidate board
             </button>
           </div>
@@ -90,7 +93,17 @@ export function PrintBallots() {
             </p>
           </>
         )}
-        {kind === 'tally' && <p className="muted">One sheet per teller. Mark a stroke per ballot in groups of five, then total each line and sign.</p>}
+        {kind === 'tally' && (
+          <>
+            <label>
+              Copies (one per teller)
+              <NumberField value={copies} onChange={setCopies} />
+            </label>
+            <p className="muted">
+              Mark one stroke per ballot; each box holds a group of five. Total each line, then have a second teller check and sign.
+            </p>
+          </>
+        )}
         {kind === 'board' && <p className="muted">Large list of the candidates for posting on the wall; fill in each ballot’s tally by hand if you are not projecting.</p>}
         <button onClick={() => window.print()} disabled={kind !== 'slips' && !position}>
           Print
@@ -117,7 +130,7 @@ export function PrintBallots() {
 
       {kind === 'tally' && position && (
         <div className="print-sheet">
-          {[0, 1].map((copy) => (
+          {Array.from({ length: Math.min(12, Math.max(1, copies ?? 2)) }, (_, copy) => (
             <section key={copy} className="tally-sheet">
               <h2>
                 Teller tally — {position.title} — {ballotNo ? `${ordinal(ballotNo)} ballot` : 'ballot # ____'}
@@ -130,7 +143,7 @@ export function PrintBallots() {
                 <thead>
                   <tr>
                     <th>Candidate</th>
-                    <th>Tally (groups of five)</th>
+                    <th>Tally (one group of five per box)</th>
                     <th>Total</th>
                   </tr>
                 </thead>
@@ -139,7 +152,7 @@ export function PrintBallots() {
                     <tr key={name}>
                       <td className="tally-name">{name}</td>
                       <td className="tally-boxes">
-                        {Array.from({ length: 12 }, (_, i) => (
+                        {Array.from({ length: tallyBoxes }, (_, i) => (
                           <span key={i} className="tally-box" />
                         ))}
                       </td>

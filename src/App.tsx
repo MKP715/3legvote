@@ -154,6 +154,16 @@ export function App() {
   useEffect(() => {
     // A failed save must be visible — the chair may need to export a backup immediately.
     setStorageErrorHandler((message) => notify(message, 'error'));
+    try {
+      const probe = '__tlv_probe__';
+      localStorage.setItem(probe, '1');
+      localStorage.removeItem(probe);
+    } catch {
+      notify(
+        'This browser will not let the app save anything (private window or blocked storage). Your election would be lost on refresh — use a normal window.',
+        'error',
+      );
+    }
     return () => setStorageErrorHandler(null);
   }, []);
   return (

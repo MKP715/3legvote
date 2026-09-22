@@ -95,7 +95,12 @@ export function TellerPanel({
           </p>
           <div role="group" className="channel-toggle">
             {CHANNELS.map((ch) => (
-              <button key={ch} className={channel === ch ? '' : 'outline secondary'} onClick={() => setChannel(ch)}>
+              <button
+                key={ch}
+                className={channel === ch ? '' : 'outline secondary'}
+                aria-pressed={channel === ch}
+                onClick={() => setChannel(ch)}
+              >
                 {CHANNEL_LABEL[ch]}
               </button>
             ))}
