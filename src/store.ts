@@ -32,6 +32,60 @@ export const STORAGE_KEY = 'third-legacy-vote/v1';
 
 const now = () => new Date().toISOString();
 
+/** Set by the UI so a failed save (e.g. browser storage full) is visible instead of silent. */
+export let onStorageError: ((message: string) => void) | null = null;
+export function setStorageErrorHandler(fn: ((message: string) => void) | null) {
+  onStorageError = fn;
+}
+
+/**
+ * Writing the whole election to localStorage on every tally tap is slow on a tablet, so writes
+ * are batched. Anything pending is flushed when the page is hidden or closed, and a failed
+ * write (quota, private mode) is reported rather than swallowed.
+ */
+function debouncedLocalStorage() {
+  let pending: { name: string; value: string } | null = null;
+  let timer: number | undefined;
+  const flush = () => {
+    if (!pending) return;
+    const { name, value } = pending;
+    pending = null;
+    window.clearTimeout(timer);
+    try {
+      localStorage.setItem(name, value);
+    } catch (e) {
+      onStorageError?.(
+        `This device could not save the election (${(e as Error).name}). Export a backup now, and free up browser storage.`,
+      );
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
+  }
+  return {
+    getItem: (name: string) => {
+      flush();
+      return localStorage.getItem(name);
+    },
+    setItem: (name: string, value: string) => {
+      pending = { name, value };
+      window.clearTimeout(timer);
+      timer = window.setTimeout(flush, 350);
+    },
+    removeItem: (name: string) => {
+      pending = null;
+      localStorage.removeItem(name);
+    },
+    flush,
+  };
+}
+
+const persistentStorage = typeof window !== 'undefined' ? debouncedLocalStorage() : undefined;
+/** Write any pending change immediately (before an export, for instance). */
+export const flushStorage = () => persistentStorage?.flush();
+
 export function emptyDraft(): DraftBallot {
   return {
     key: nanoid(10),
@@ -107,15 +161,27 @@ export function normalizeAssembly(raw: unknown): Assembly {
     electionType: type,
     id: typeof a.id === 'string' ? a.id : base.id,
     voters: { ...base.voters, ...(a.voters ?? {}) },
-    roles: Array.isArray(a.roles) && a.roles.length ? a.roles : base.roles,
     voterRoll: Array.isArray(a.voterRoll) ? a.voterRoll : [],
     officials: { ...emptyOfficials(), ...(a.officials ?? {}) },
     approvals: { ...base.approvals, ...(a.approvals ?? {}) },
-    live: { ...idleLive(), ...(a.live ?? {}) },
+    // A file opened later must not put the projector back into "voting open" with a stale timer.
+    live: { ...idleLive(), message: a.live?.message ?? '' },
     ballotColors: Array.isArray(a.ballotColors) ? a.ballotColors : base.ballotColors,
     language: a.language ?? 'en',
     settings: { ...DEFAULT_SETTINGS, ...(a.settings ?? {}) },
     log: Array.isArray(a.log) ? a.log : [],
+    ...(() => {
+      // Keep every role the voter roll refers to, so imported voters never lose their role.
+      const roles = Array.isArray(a.roles) && a.roles.length ? [...a.roles] : [...base.roles];
+      const known = new Set(roles.map((r) => r.id));
+      for (const v of Array.isArray(a.voterRoll) ? a.voterRoll : []) {
+        if (v?.roleId && !known.has(v.roleId)) {
+          known.add(v.roleId);
+          roles.push({ id: v.roleId, name: `${v.roleId} (imported)`, votes: true });
+        }
+      }
+      return { roles };
+    })(),
     positions: a.positions.map((p) => ({
       ...newPosition(p.title ?? 'Position'),
       ...p,
@@ -189,6 +255,8 @@ interface Actions {
   reinstateCandidate: (aid: string, pid: string, cid: string) => void;
 
   setDraft: (aid: string, pid: string, draft: DraftBallot | null) => void;
+  /** Zero the counts but keep the teller link alive and the reports listed. */
+  clearDraftCounts: (aid: string, pid: string) => void;
   addTellerReport: (aid: string, pid: string, report: Omit<TellerReport, 'addedAt'>) => void;
   removeTellerReport: (aid: string, pid: string, reportId: string) => void;
   recordBallot: (aid: string, pid: string) => void;
@@ -399,8 +467,13 @@ export const useStore = create<Store>()(
           const src = a?.positions.find((x) => x.id === pid);
           if (!a || !src) return null;
           const base = src.title.replace(/\s+—\s+seat\s+\d+$/i, '');
-          const seats = a.positions.filter((p) => p.title === base || p.title.startsWith(`${base} — seat`)).length;
-          const newId = get().addPosition(aid, `${base} — seat ${seats + 1}`, pid);
+          const family = a.positions.filter((p) => p.title === base || p.title.startsWith(`${base} — seat`));
+          const highest = family.reduce((max, p) => {
+            const m = p.title.match(/seat\s+(\d+)$/i);
+            return Math.max(max, m ? Number(m[1]) : 1);
+          }, 1);
+          const last = family[family.length - 1] ?? src;
+          const newId = get().addPosition(aid, `${base} — seat ${highest + 1}`, last.id);
           get().copyCandidates(aid, newId, pid);
           return newId;
         },
@@ -432,6 +505,9 @@ export const useStore = create<Store>()(
             const c = p.candidates.find((x) => x.id === cid);
             const clean = name.trim().replace(/\s+/g, ' ');
             if (!c || !clean || c.name === clean) return;
+            if (p.candidates.some((x) => x.id !== cid && x.name.toLowerCase() === clean.toLowerCase())) {
+              throw new ActionError(`${clean} is already a candidate for ${p.title}.`);
+            }
             log(a, 'Candidate renamed', `${c.name} → ${clean}`, pid);
             c.name = clean;
           }),
@@ -496,7 +572,8 @@ export const useStore = create<Store>()(
 
         reopenNominations: (aid, pid) =>
           mutatePos(aid, pid, (p, a) => {
-            if (p.ballots.length || p.appointment) return;
+            if (p.ballots.length) throw new ActionError('Undo the recorded ballots first.');
+            if (p.appointment) throw new ActionError('This position was filled from another position’s hat draw — undo that draw first.');
             p.started = false;
             for (const c of p.candidates) c.withdrawnBeforeBallot = null;
             log(a, 'Nominations reopened', p.title, pid);
@@ -505,27 +582,47 @@ export const useStore = create<Store>()(
         withdrawCandidate: (aid, pid, cid) =>
           mutatePos(aid, pid, (p, a) => {
             const c = p.candidates.find((x) => x.id === cid);
-            if (!c || c.withdrawnBeforeBallot !== null || p.hat) return;
-            c.withdrawnBeforeBallot = p.ballots.length + 1;
+            if (!c) throw new ActionError('That candidate is no longer on the board.');
+            if (c.withdrawnBeforeBallot !== null) throw new ActionError(`${c.name} has already withdrawn.`);
+            if (p.hat) throw new ActionError('The choice has already gone to the hat.');
+            // If the tellers have already started counting a ballot, the candidate was on the
+            // board for it: their votes stay in that ballot's total and the withdrawal takes
+            // effect for the ballot after it. Removing them now would shrink the total vote and
+            // could elect someone on less than two-thirds of the ballots actually cast.
+            const counting =
+              !!p.draft && CHANNELS.some((ch) => Object.values(p.draft!.counts[ch].votes).some((n) => n > 0) || p.draft!.counts[ch].invalid > 0);
+            c.withdrawnBeforeBallot = p.ballots.length + (counting ? 2 : 1);
             log(
               a,
               'Candidate withdrew voluntarily',
-              `${c.name} — ${p.title}${p.ballots.length ? ` (after the ${ordinal(p.ballots.length)} ballot)` : ' (before the 1st ballot)'}`,
+              `${c.name} — ${p.title}${
+                p.ballots.length ? ` (after the ${ordinal(p.ballots.length)} ballot)` : ' (before the 1st ballot)'
+              }${counting ? `; stays on the ${ordinal(p.ballots.length + 1)} ballot being counted` : ''}`,
               pid,
             );
-            if (p.draft) for (const ch of CHANNELS) delete p.draft.counts[ch].votes[cid];
           }),
 
         reinstateCandidate: (aid, pid, cid) =>
           mutatePos(aid, pid, (p, a) => {
             const c = p.candidates.find((x) => x.id === cid);
+            if (!c) throw new ActionError('That candidate is no longer on the board.');
             // Only a withdrawal made since the last ballot can be taken back.
-            if (!c || c.withdrawnBeforeBallot !== p.ballots.length + 1 || p.hat) return;
+            if ((c.withdrawnBeforeBallot !== p.ballots.length + 1 && c.withdrawnBeforeBallot !== p.ballots.length + 2) || p.hat) {
+              throw new ActionError(`${c.name}’s withdrawal was announced before the last ballot and cannot be taken back.`);
+            }
             c.withdrawnBeforeBallot = null;
             log(a, 'Voluntary withdrawal taken back', `${c.name} — ${p.title}`, pid);
           }),
 
         setDraft: (aid, pid, draft) => mutatePos(aid, pid, (p) => void (p.draft = draft)),
+
+        clearDraftCounts: (aid, pid) =>
+          mutatePos(aid, pid, (p, a) => {
+            const key = p.draft?.key;
+            const reports = p.draft?.tellerReports?.length ?? 0;
+            p.draft = { ...emptyDraft(), key: key ?? emptyDraft().key };
+            log(a, 'Ballot counts cleared', `${p.title}${reports ? ` (${reports} teller/poll report(s) removed)` : ''}`, pid);
+          }),
 
         addTellerReport: (aid, pid, report) =>
           mutatePos(aid, pid, (p, a) => {
@@ -538,6 +635,15 @@ export const useStore = create<Store>()(
             if (st.phase.isConfirmation) allowed.add(AGAINST);
             for (const k of Object.keys(report.votes)) {
               if (!allowed.has(k)) throw new ActionError('This report lists a candidate who is not on this ballot.');
+            }
+            const eligible = effectiveVoters(a)[report.channel];
+            const reportTotal = Object.values(report.votes).reduce((x, y) => x + y, 0) + report.invalid;
+            // A report with more than twice the eligible voters cannot be right; a smaller
+            // over-count may just mean the roll is incomplete, and is flagged on the ballot.
+            if (eligible > 0 && reportTotal > eligible * 2) {
+              throw new ActionError(
+                `That report has ${reportTotal} ballots but only ${eligible} ${report.channel === 'virtual' ? 'virtual' : 'in-person'} voters are eligible. Check the report — it looks like it belongs to a different ballot.`,
+              );
             }
             const c = d.counts[report.channel];
             // Same report id again = the teller kept counting and re-sent it: replace the old one.
@@ -594,6 +700,7 @@ export const useStore = create<Store>()(
               counts,
               eligibleVoters: { ...effectiveVoters(a) },
               collected: { ...d.collected },
+              tellerReports: d.tellerReports?.length ? JSON.parse(JSON.stringify(d.tellerReports)) : undefined,
               recordedAt: now(),
               note: [d.note, d.tellerReports?.length ? `${d.tellerReports.length} teller/poll report(s) combined` : ''].filter(Boolean).join(' · ') || undefined,
             });
@@ -614,9 +721,14 @@ export const useStore = create<Store>()(
 
         undoLastBallot: (aid, pid) =>
           mutatePos(aid, pid, (p, a) => {
-            if (!p.ballots.length) return;
+            if (!p.ballots.length) throw new ActionError('No ballots have been recorded for this position.');
             if (p.hat || (p.ballots.length === 4 && p.motionVotes.length)) {
               throw new ActionError('Undo the hat draw / fifth-ballot motion first.');
+            }
+            const draftInProgress =
+              !!p.draft && CHANNELS.some((ch) => Object.values(p.draft!.counts[ch].votes).some((n) => n > 0) || p.draft!.counts[ch].invalid > 0);
+            if (draftInProgress) {
+              throw new ActionError('Counts have already been entered for the next ballot. Clear those counts first, then undo.');
             }
             const removed = p.ballots.pop()!;
             const n = p.ballots.length;
@@ -628,11 +740,13 @@ export const useStore = create<Store>()(
               }
             }
             // Put the counts back so the tellers can correct them (recount) rather than retype.
+            // Teller/poll reports are kept with them, so the same file cannot be added twice.
             p.draft = {
               ...emptyDraft(),
               counts: JSON.parse(JSON.stringify(removed.counts)),
               collected: { ...removed.collected },
               note: removed.note ?? '',
+              tellerReports: removed.tellerReports ? JSON.parse(JSON.stringify(removed.tellerReports)) : [],
             };
             log(a, `${ordinal(n + 1)} ballot reopened for correction`, p.title, pid);
           }),
@@ -665,7 +779,7 @@ export const useStore = create<Store>()(
 
         undoMotion: (aid, pid) =>
           mutatePos(aid, pid, (p, a) => {
-            if (!p.motionVotes.length) return;
+            if (!p.motionVotes.length) throw new ActionError('No motion has been recorded for this position.');
             if (p.hat || p.ballots.length > 4) throw new ActionError('Undo the fifth ballot / hat draw first.');
             p.motionVotes.pop();
             log(a, 'Fifth-ballot motion undone', p.title, pid);
@@ -677,7 +791,16 @@ export const useStore = create<Store>()(
             if (!p) return;
             const st = computePosition(p, a.settings);
             if (st.phase.kind !== 'hat') throw new ActionError('This position is not going to the hat.');
-            if (!draw.order.length || !st.phase.poolIds.includes(draw.order[0])) throw new ActionError('Invalid draw.');
+            const pool = st.phase.poolIds;
+            if (!draw.order.length || !pool.includes(draw.order[0])) throw new ActionError('Invalid draw.');
+            if (new Set(draw.order).size !== draw.order.length || draw.order.some((id) => !pool.includes(id))) {
+              throw new ActionError('The draw order does not match the names in the hat.');
+            }
+            if (p.hatSecondToPositionId && draw.order.length < pool.length) {
+              throw new ActionError(
+                'This position passes the second name drawn to another position, so every slip must be drawn and recorded in order.',
+              );
+            }
             p.hat = { ...draw, drawnAt: now() };
             setStatus(a, 'idle');
             log(
@@ -692,12 +815,14 @@ export const useStore = create<Store>()(
               if (target && !target.started && !target.appointment) {
                 const name = candName(p, draw.order[1]);
                 let c = target.candidates.find((x) => x.name.toLowerCase() === name.toLowerCase());
+                let created = false;
                 if (!c) {
                   const src = p.candidates.find((x) => x.id === draw.order[1]);
                   c = { id: nanoid(8), name, district: src?.district, withdrawnBeforeBallot: null };
                   target.candidates.push(c);
+                  created = true;
                 }
-                target.appointment = { candidateId: c.id, fromPositionId: p.id, fromPositionTitle: p.title };
+                target.appointment = { candidateId: c.id, fromPositionId: p.id, fromPositionTitle: p.title, createdCandidate: created };
                 target.started = true;
                 target.startedAt = now();
                 log(a, 'Elected by second draw from the hat', `${name} — ${target.title} (from ${p.title})`, target.id);
@@ -708,14 +833,16 @@ export const useStore = create<Store>()(
         undoHat: (aid, pid) =>
           mutate(aid, (a) => {
             const p = a.positions.find((x) => x.id === pid);
-            if (!p || !p.hat) return;
+            if (!p) return;
+            if (!p.hat) throw new ActionError('No hat draw has been recorded for this position.');
             p.hat = null;
             for (const t of a.positions) {
               if (t.appointment?.fromPositionId === pid) {
-                const cid = t.appointment.candidateId;
+                const { candidateId: cid, createdCandidate } = t.appointment;
                 t.appointment = null;
                 t.started = false;
-                if (!t.ballots.length) t.candidates = t.candidates.filter((c) => c.id !== cid);
+                // Only remove the candidate row if this draw created it.
+                if (createdCandidate && !t.ballots.length) t.candidates = t.candidates.filter((c) => c.id !== cid);
                 log(a, 'Second-draw appointment undone', t.title, t.id);
               }
             }
@@ -750,10 +877,20 @@ export const useStore = create<Store>()(
     {
       name: STORAGE_KEY,
       version: 2,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => persistentStorage ?? localStorage),
       migrate: (persisted) => {
+        // One unreadable record must never wipe the rest of someone's elections.
         const s = persisted as { assemblies?: unknown[] };
-        return { assemblies: (s?.assemblies ?? []).map((a) => normalizeAssembly(a)) } as unknown as Store;
+        const out: Assembly[] = [];
+        for (const a of s?.assemblies ?? []) {
+          try {
+            out.push(normalizeAssembly(a));
+          } catch {
+            const name = (a as { name?: string })?.name;
+            onStorageError?.(`One saved election (${name ?? 'unnamed'}) could not be read and was skipped.`);
+          }
+        }
+        return { assemblies: out } as unknown as Store;
       },
     },
   ),

@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
-import { nanoid } from 'nanoid';
 import { AGAINST, CHANNEL_LABEL, CHANNELS, type Assembly, type Channel, type DraftBallot, type Position } from '../engine/types';
 import { decodeResult, tellerUrl, type TellerSetup } from '../engine/tellerCodes';
 import { parsePoll, type PollImportResult } from '../engine/pollImport';
 import { ballotColor } from '../presets';
+import { pollExample, saveCsv } from '../templates';
 import { useStore } from '../store';
 import { nameOf } from '../announce';
 import { ordinal } from '../engine/thirdLegacy';
@@ -250,19 +250,22 @@ function PollImport({
     const ok = attempt(
       () =>
         s.addTellerReport(assembly.id, position.id, {
-          id: nanoid(10),
+          // Derived from the contents, so re-importing the same file replaces rather than doubles.
+          id: `poll-${result.signature}`,
           teller: fileName || 'Virtual poll',
           channel: 'virtual',
           source: 'poll',
           votes: result.votes,
           invalid: result.invalid,
-          detail: `${result.responses} response(s)${result.duplicatesRemoved ? `, ${result.duplicatesRemoved} duplicate(s) not counted` : ''}${result.question ? `; question “${result.question}”` : ''}`,
+          detail: `${result.responses} response(s)${result.duplicatesRemoved ? `, ${result.duplicatesRemoved} repeat(s) not counted` : ''}${result.question ? `; question “${result.question}”` : ''}`,
         }),
       'Virtual poll results added.',
     );
     if (ok) {
       setText('');
       setFileName('');
+      setColumn(undefined);
+      setQuestion(null);
     }
   };
 
@@ -274,19 +277,37 @@ function PollImport({
         load it here. The answer column is found automatically; each participant is counted once (their latest answer). Answers with more than one name
         or an unknown name count as invalid.
       </p>
-      <input
-        type="file"
-        accept=".csv,text/csv,text/plain"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (!f) return;
-          setFileName(f.name);
-          setColumn(undefined);
-          setQuestion(null);
-          setText(await f.text());
-          e.target.value = '';
-        }}
-      />
+      <div className="row wrap">
+        <input
+          type="file"
+          accept=".csv,text/csv,text/plain"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            setFileName(f.name);
+            setColumn(undefined);
+            setQuestion(null);
+            setText((await f.text()).replace(/^﻿/, ''));
+            e.target.value = '';
+          }}
+        />
+        <button
+          className="outline secondary mini"
+          onClick={() =>
+            saveCsv(
+              pollExample(
+                position,
+                number,
+                options.filter((o) => o !== AGAINST).map((o) => nameOf(position, o)),
+              ),
+              'example-poll-export.csv',
+            )
+          }
+          title="See the format a meeting-platform poll export should have"
+        >
+          Example file
+        </button>
+      </div>
       {result && 'error' in result && <p className="warn-box">{result.error}</p>}
       {result && !('error' in result) && (
         <div className="poll-preview">
@@ -306,7 +327,7 @@ function PollImport({
             {result.questions.length > 1 && (
               <label>
                 Poll question (the report has several)
-                <select value={result.question ?? ''} onChange={(e) => setQuestion(e.target.value)}>
+                <select value={question ?? result.question ?? ''} onChange={(e) => setQuestion(e.target.value)}>
                   {result.questions.map((q) => (
                     <option key={q} value={q}>
                       {q}
@@ -322,18 +343,37 @@ function PollImport({
                 <strong>{label(o)}</strong>: {result.votes[o] ?? 0}
               </li>
             ))}
-            <li>Invalid / unrecognised: {result.invalid}</li>
+            <li>
+              Invalid / unrecognised: {result.invalid}
+              {result.unmatched.length > 0 && <span className="sub muted"> — {result.unmatched.join(', ')}</span>}
+            </li>
+            <li>
+              <strong>Total counted: {Object.values(result.votes).reduce((x, y) => x + y, 0) + result.invalid}</strong> of {result.responses} response(s)
+            </li>
           </ul>
+          {result.dedupeNote && <div className={result.dedupeDisabled ? 'warn-box' : 'ok-box'}>{result.dedupeNote}</div>}
+          {result.questionAmbiguous && (
+            <div className="warn-box">
+              This file contains {result.questions.length} polls. Choose the one for the {ordinal(number)} ballot of {position.title} above before adding
+              it.
+            </div>
+          )}
           <p className="sub muted">
-            {result.responses} response(s) in “{result.answerColumn}”
-            {result.identityColumn ? `, one per “${result.identityColumn}”` : ' (no name/email column found — duplicates cannot be detected)'}
-            {result.duplicatesRemoved ? ` · ${result.duplicatesRemoved} duplicate response(s) not counted` : ''}
-            {result.unmatched.length ? ` · not recognised: ${result.unmatched.join(', ')}` : ''}
+            Answers read from “{result.answerColumn}”
+            {result.identityColumn ? `; participants identified by “${result.identityColumn}”` : ''}
+            {result.question ? `; question “${result.question}”` : ''}.
           </p>
-          <p className="sub muted">Make sure this is the poll for the {ordinal(number)} ballot of {position.title}.</p>
           <div className="row">
-            <button onClick={apply}>Add to Virtual counts</button>
-            <button className="outline secondary" onClick={() => setText('')}>
+            <button onClick={apply} disabled={result.questionAmbiguous}>
+              Add to Virtual counts
+            </button>
+            <button
+              className="outline secondary"
+              onClick={() => {
+                setText('');
+                setFileName('');
+              }}
+            >
               Discard
             </button>
           </div>

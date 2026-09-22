@@ -5,15 +5,27 @@ import jsQR from 'jsqr';
 /** Renders text as a QR code image (generated locally — nothing leaves the device). */
 export function QrCode({ text, size = 220, label }: { text: string; size?: number; label?: string }) {
   const [src, setSrc] = useState<string>('');
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     let alive = true;
+    setFailed(false);
     QRCode.toDataURL(text, { errorCorrectionLevel: 'M', margin: 1, width: size * 2 })
-      .then((url) => alive && setSrc(url))
-      .catch(() => alive && setSrc(''));
+      .then((url) => {
+        if (alive) setSrc(url);
+      })
+      .catch(() => {
+        if (alive) {
+          setSrc('');
+          setFailed(true);
+        }
+      });
     return () => {
       alive = false;
     };
   }, [text, size]);
+  if (failed) {
+    return <p className="warn-box">The QR code could not be drawn on this device — use “Copy teller link” instead and send the link to the teller.</p>;
+  }
   if (!src) return null;
   return <img className="qr" src={src} width={size} height={size} alt={label ?? 'QR code'} />;
 }
@@ -23,6 +35,9 @@ export function QrScanner({ onResult, onClose }: { onResult: (text: string) => v
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState('');
+  // Kept in a ref so an inline handler from the caller never restarts the camera.
+  const handler = useRef(onResult);
+  handler.current = onResult;
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -41,7 +56,7 @@ export function QrScanner({ onResult, onClose }: { onResult: (text: string) => v
           const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
           if (code?.data) {
             done = true;
-            onResult(code.data);
+            handler.current(code.data);
             return;
           }
         }
@@ -50,12 +65,16 @@ export function QrScanner({ onResult, onClose }: { onResult: (text: string) => v
     };
     (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-        if (video.current) {
-          video.current.srcObject = stream;
-          await video.current.play();
-          raf = requestAnimationFrame(tick);
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        // The scanner may have been closed while the permission prompt was open.
+        if (done || !video.current) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
         }
+        stream = s;
+        video.current.srcObject = s;
+        await video.current.play();
+        raf = requestAnimationFrame(tick);
       } catch {
         setError('Could not open the camera. Allow camera access, or paste the code instead.');
       }
@@ -65,7 +84,7 @@ export function QrScanner({ onResult, onClose }: { onResult: (text: string) => v
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [onResult]);
+  }, []);
 
   return (
     <div className="scanner">

@@ -33,12 +33,13 @@ export const PRESETS: Record<ElectionType, Preset> = {
       r('altgsr', 'Alternate GSR', true, { alternateFor: 'gsr' }),
       r('dcm', 'DCM', true),
       r('altdcm', 'Alternate DCM', true, { alternateFor: 'dcm' }),
-      r('officer', 'Area officer', true),
-      r('chair', 'Standing committee chair', true),
+      r('officer', 'Area officer (chair, secretary, treasurer, registrar…)', true),
+      r('altofficer', 'Alternate area officer', true, { alternateFor: 'officer' }),
+      r('chair', 'Standing committee chair / coordinator', true),
       r('pastdel', 'Past delegate', false),
       r('visitor', 'Visitor / non-voting', false),
     ],
-    whoVotes: 'GSRs, DCMs and area committee members (per the area’s guidelines). Alternates vote only when their GSR or DCM is absent.',
+    whoVotes: 'GSRs, DCMs and area committee members — including area officers — per the area’s guidelines. Alternates vote only when the person they stand in for is absent.',
   },
   district: {
     label: 'District election',
@@ -48,10 +49,12 @@ export const PRESETS: Record<ElectionType, Preset> = {
     roles: [
       r('gsr', 'GSR', true),
       r('altgsr', 'Alternate GSR', true, { alternateFor: 'gsr' }),
+      r('officer', 'District officer (secretary, treasurer…)', true),
+      r('chair', 'District committee chair', true),
       r('dcm', 'Outgoing DCM', false),
       r('visitor', 'Visitor / non-voting', false),
     ],
-    whoVotes: 'GSRs of the district’s groups (alternate GSRs vote when their GSR is absent).',
+    whoVotes: 'GSRs of the district’s groups, and district officers where the district’s guidelines give them a vote (alternate GSRs vote when their GSR is absent).',
   },
   areaTrusteeCandidate: {
     label: 'Area selection of a trustee candidate',
@@ -62,10 +65,13 @@ export const PRESETS: Record<ElectionType, Preset> = {
       r('gsr', 'GSR', true),
       r('altgsr', 'Alternate GSR', true, { alternateFor: 'gsr' }),
       r('dcm', 'DCM', true),
+      r('altdcm', 'Alternate DCM', true, { alternateFor: 'dcm' }),
       r('officer', 'Area officer', true),
+      r('chair', 'Standing committee chair / coordinator', true),
+      r('pastdel', 'Past delegate', false),
       r('visitor', 'Visitor / non-voting', false),
     ],
-    whoVotes: 'Voting members of the area assembly.',
+    whoVotes: 'Voting members of the area assembly (GSRs, DCMs and area committee members, including officers).',
   },
   regionalTrustee: {
     label: 'Regional trustee nominating session (Conference)',
@@ -101,6 +107,7 @@ export const PRESETS: Record<ElectionType, Preset> = {
     roles: [
       r('igr', 'Intergroup representative', true),
       r('altigr', 'Alternate representative', true, { alternateFor: 'igr' }),
+      r('officer', 'Intergroup officer', true),
       r('steer', 'Steering committee member', true),
       r('visitor', 'Visitor / non-voting', false),
     ],
@@ -111,10 +118,33 @@ export const PRESETS: Record<ElectionType, Preset> = {
     description: 'Any service body using the Third Legacy Procedure.',
     positions: [],
     optionalPositions: ['Chair', 'Secretary', 'Treasurer'],
-    roles: [r('member', 'Voting member', true), r('nonvoting', 'Non-voting', false)],
+    roles: [r('member', 'Voting member', true), r('officer', 'Officer', true), r('alt', 'Alternate', true, { alternateFor: 'member' }), r('nonvoting', 'Non-voting', false)],
     whoVotes: 'Voting members as defined by the body’s guidelines.',
   },
 };
+
+/**
+ * Common service titles → role id, so an imported roll with "Area Chair", "Alt. GSR",
+ * "Treasurer" or "DCM" lands on the right role instead of a silent default.
+ */
+export const ROLE_ALIASES: { match: RegExp; role: string }[] = [
+  { match: /^(alt|alternate|alt\.)\s*(gsr|g\.s\.r|general service rep)/, role: 'altgsr' },
+  { match: /^(gsr|g\.s\.r|general service rep)/, role: 'gsr' },
+  { match: /^(alt|alternate|alt\.)\s*(dcm|d\.c\.m|district committee)/, role: 'altdcm' },
+  { match: /^(dcm|d\.c\.m|district committee member)/, role: 'dcm' },
+  { match: /^(alt|alternate|alt\.)\s*(officer|chair|secretary|treasurer|registrar)/, role: 'altofficer' },
+  // Standing-committee chairs before the generic "chair" so they don't land on "officer".
+  { match: /(committee chair|coordinator|standing committee|chair of)/, role: 'chair' },
+  { match: /(^|\s)(officer|chairperson|chair|secretary|treasurer|registrar|archivist)(\s|$)/, role: 'officer' },
+  { match: /(past delegate|ex delegate)/, role: 'pastdel' },
+  { match: /(alt|alternate)\s*(rep|representative|igr)/, role: 'altigr' },
+  { match: /(intergroup|central office)\s*(rep|representative)|^igr/, role: 'igr' },
+  { match: /(steering)/, role: 'steer' },
+  { match: /(conference committee on trustees)/, role: 'cct' },
+  { match: /(nominating committee)/, role: 'tnc' },
+  { match: /(delegate)/, role: 'regdel' },
+  { match: /(visitor|observer|guest|non voting|nonvoting)/, role: 'visitor' },
+];
 
 export const DEFAULT_BALLOT_COLORS = ['White', 'Yellow', 'Blue', 'Pink', 'Green', 'Orange', 'Purple', 'Grey'];
 

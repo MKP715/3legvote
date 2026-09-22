@@ -9,9 +9,18 @@ import { TimerFace } from '../components/LiveControls';
 import { ballotColor } from '../presets';
 import { listL, t } from '../i18n';
 
-export function openDisplay(aid: string) {
-  const url = `${window.location.href.split('#')[0]}#/display/${aid}`;
-  window.open(url, 'third-legacy-display', 'popup=yes,width=1280,height=800');
+export function displayUrl(aid: string): string {
+  return `${window.location.href.split('#')[0]}#/display/${aid}`;
+}
+
+/** Opens the projector window; returns false if the browser blocked the pop-up. */
+export function openDisplay(aid: string): boolean {
+  const w = window.open(displayUrl(aid), 'third-legacy-display', 'popup=yes,width=1280,height=800');
+  if (w) {
+    w.focus();
+    return true;
+  }
+  return false;
 }
 
 /** Cycles through names while the chair is drawing from the hat. */
@@ -92,6 +101,9 @@ export function Display() {
   }
 
   const liveHere = assembly.livePositionId === position.id;
+  // With many candidates or many ballots the board alone fills a 1080p screen; the chart
+  // would push the last rows off the bottom, so it is dropped.
+  const tallBoard = position.candidates.length + state.ballots.length > 9;
   let statusLine: string | null = null;
   if (liveHere && live.status === 'voting' && phase.kind === 'ballot') statusLine = d.votingOpen(d.ballot(phase.number), color?.name ?? null);
   if (liveHere && live.status === 'counting' && phase.kind === 'ballot') statusLine = d.counting;
@@ -128,7 +140,7 @@ export function Display() {
 
       {extras}
 
-      {phase.kind === 'hat' && liveHere && live.status === 'drawing' ? (
+      {phase.kind === 'hat' && liveHere && live.status === 'drawing' && Date.now() - new Date(live.since).getTime() < 20000 ? (
         <div className="display-elected">
           <div className="elected-label">{d.drawing}</div>
           <HatSpin names={phase.poolIds.map((id) => nameOf(position, id, lang))} />
@@ -155,12 +167,12 @@ export function Display() {
       )}
 
       {last && (
-        <div className="display-grid">
+        <div className={`display-grid ${tallBoard ? 'one-col' : ''}`}>
           <section>
             <Board position={position} state={state} breakdown={breakdown} large lang={lang} />
           </section>
           <section>
-            <BallotChart position={position} result={last} large />
+            {!tallBoard && <BallotChart position={position} result={last} large lang={lang} />}
             {phase.kind !== 'elected' && (
               <div className="display-announce">
                 {ballotAnnouncement(position, last, lang)

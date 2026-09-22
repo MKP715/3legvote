@@ -3,6 +3,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+// Deterministic: the same source must always produce the same files, so CI can check that the
+// published build at the repository root is up to date. Bump the version in package.json.
+const buildStamp = pkg.version;
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -13,6 +19,7 @@ export default defineConfig({
   root: here('./src'),
   publicDir: here('./public'),
   base: './',
+  define: { __APP_VERSION__: JSON.stringify(buildStamp) },
   plugins: [
     react(),
     VitePWA({

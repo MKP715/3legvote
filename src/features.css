@@ -218,6 +218,9 @@ button.mini,
 .display-spin {
   font-size: clamp(3rem, 9vw, 6rem);
 }
+.display-grid.one-col {
+  grid-template-columns: 1fr;
+}
 .display-candidates {
   font-size: clamp(1.4rem, 3vw, 2.4rem);
   columns: 2;
@@ -471,14 +474,113 @@ button.mini,
   }
 }
 
-/* Small screens: wide tables scroll inside themselves instead of widening the page. */
+/* Small screens: wide tables scroll inside their wrapper (keeping table semantics for
+   screen readers) instead of widening the page. */
 @media (max-width: 700px) {
-  main table {
+  main .table-scroll,
+  main .board-wrap,
+  main article > table,
+  main > table {
     display: block;
     overflow-x: auto;
     max-width: 100%;
   }
   .positions-table .mini-group button {
     padding: 0.25rem 0.45rem;
+  }
+}
+.toasts {
+  pointer-events: none;
+}
+.tally-running {
+  font-size: 0.9rem;
+}
+
+/* Printing: keep rows whole, repeat table headings across pages, force black ink. */
+@media print {
+  .slip,
+  .slip * {
+    color: #000 !important;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr,
+  li {
+    break-inside: avoid;
+  }
+  h2,
+  h3,
+  h4 {
+    break-after: avoid;
+  }
+  .report-ballot,
+  .stat,
+  .announce {
+    break-inside: avoid;
+  }
+}
+
+/* Printing must be legible whatever theme the operator is using on screen. */
+@media print {
+  :root,
+  :root[data-theme='dark'],
+  :root[data-theme='light'] {
+    color-scheme: light;
+    --pico-color: #000;
+    --pico-h1-color: #000;
+    --pico-h2-color: #000;
+    --pico-h3-color: #000;
+    --pico-h4-color: #000;
+    --pico-h5-color: #000;
+    --pico-h6-color: #000;
+    --pico-muted-color: #444;
+    --pico-background-color: #fff;
+    --pico-card-background-color: #fff;
+    --pico-muted-border-color: #999;
+  }
+  body,
+  main,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  td,
+  th,
+  li,
+  summary {
+    color: #000 !important;
+    background: transparent !important;
+  }
+  /* An overflow container does not scroll on paper — it cuts the last ballots off. */
+  .table-scroll,
+  .board-wrap,
+  main table {
+    overflow: visible !important;
+    display: revert !important;
+  }
+  .board {
+    font-size: 9pt;
+  }
+  .tally-box {
+    opacity: 1;
+  }
+  .tally-boxes {
+    white-space: normal;
+  }
+  /* No trailing blank page after the last slip or sheet. */
+  .slip:nth-child(8n):last-child,
+  .tally-sheet:last-child {
+    break-after: auto;
+  }
+  .report-position {
+    break-inside: auto;
+  }
+  /* The attendance list belongs in the printed record even if collapsed on screen. */
+  details.report-attendance > *:not(summary) {
+    display: block !important;
   }
 }

@@ -616,6 +616,10 @@ body.display-mode {
 .slips {
   display: none;
 }
+@page {
+  size: auto;
+  margin: 0.4in;
+}
 @media print {
   .no-print,
   .app-header,
@@ -635,7 +639,8 @@ body.display-mode {
   .slips {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-auto-rows: calc((100vh - 0.1in) / 4);
+    /* Fixed height: four rows fit both Letter (10.2in of content) and A4 (10.9in). */
+    grid-auto-rows: 2.4in;
   }
   .slip {
     border: 1px dashed #999;
@@ -649,6 +654,9 @@ body.display-mode {
   }
   .slip:nth-child(8n) {
     break-after: page;
+  }
+  .slip:last-child {
+    break-after: auto;
   }
   .slip-head {
     font-size: 9pt;

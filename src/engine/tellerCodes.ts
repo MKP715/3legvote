@@ -8,7 +8,7 @@
  *  3. The chair pastes or scans the report; its counts are added to that ballot. The key stops
  *     a report from being added to the wrong ballot, and the report id stops it being added twice.
  */
-import type { Channel } from './types';
+import { CHANNELS, type Channel } from './types';
 
 export interface TellerSetup {
   v: 1;
@@ -80,13 +80,14 @@ function decode<T>(prefix: string, code: string): T {
 export const encodeSetup = (s: TellerSetup) => encode(PREFIX_SETUP, s);
 export const decodeSetup = (code: string) => {
   const s = decode<TellerSetup>(PREFIX_SETUP, code);
-  if (s.v !== 1 || !Array.isArray(s.o) || !s.k) throw new Error('Unsupported teller setup.');
+  const optionsOk = Array.isArray(s.o) && s.o.length > 0 && s.o.every((o) => Array.isArray(o) && o.length === 2 && typeof o[1] === 'string');
+  if (s.v !== 1 || !optionsOk || !s.k || !CHANNELS.includes(s.ch)) throw new Error('Unsupported teller setup.');
   return s;
 };
 export const encodeResult = (r: TellerResult) => encode(PREFIX_RESULT, r);
 export const decodeResult = (code: string) => {
   const r = decode<TellerResult>(PREFIX_RESULT, code);
-  if (r.v !== 1 || !Array.isArray(r.c) || !r.k || !r.r) throw new Error('Unsupported teller report.');
+  if (r.v !== 1 || !Array.isArray(r.c) || !r.k || !r.r || !CHANNELS.includes(r.ch)) throw new Error('Unsupported teller report.');
   if (r.c.some((x) => !Number.isInteger(x) || x < 0) || !Number.isInteger(r.i) || r.i < 0) throw new Error('The report contains invalid numbers.');
   return r;
 };

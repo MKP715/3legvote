@@ -25,8 +25,8 @@ export function PrintBallots() {
   const state = position ? computePosition(position, a.settings) : null;
   const standing = position ? position.candidates.filter((c) => state?.status[c.id]?.kind === 'standing' || !position.started) : [];
   const voters = effectiveVoters(a);
-  const n = Math.min(1000, count ?? (voters.inPerson > 0 ? voters.inPerson : 40));
-  const rounded = Math.ceil(n / 8) * 8;
+  const n = Math.min(1000, Math.max(1, count ?? (voters.inPerson > 0 ? voters.inPerson : 40)));
+  const rounded = Math.max(8, Math.ceil(n / 8) * 8);
   const color = ballotNo ? ballotColor(a.ballotColors, ballotNo) : null;
 
   return (

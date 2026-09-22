@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import Papa from 'papaparse';
 import type { Assembly, Position } from '../engine/types';
 import { useStore } from '../store';
+import { normName } from '../engine/voters';
+import { candidateTemplate, saveCsv } from '../templates';
 import { attempt, confirmAction, notify } from './ui';
 
 /** Nominations: build the list of eligible candidates, then close nominations. */
@@ -9,21 +12,59 @@ export function CandidateSetup({ assembly, position }: { assembly: Assembly; pos
   const [name, setName] = useState('');
   const [district, setDistrict] = useState('');
   const [copyFrom, setCopyFrom] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
   const others = assembly.positions.filter((p) => p.id !== position.id);
 
+  /** Import a prepared list of eligible candidates (Name, District, Note). */
+  const importCsv = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      const text = (await f.text()).replace(/^\uFEFF/, '');
+      const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: 'greedy' });
+      const pick = (row: Record<string, string>, keys: string[]) => {
+        for (const k of Object.keys(row)) {
+          const nk = normName(k);
+          if (keys.some((x) => nk === x || nk.includes(x))) return (row[k] ?? '').trim();
+        }
+        return '';
+      };
+      let added = 0;
+      let failed = 0;
+      for (const row of parsed.data) {
+        const n = pick(row, ['name', 'candidate', 'nombre', 'nom']);
+        if (!n) continue;
+        const d = pick(row, ['district', 'distrito', 'area', 'group']);
+        // Collect the count rather than showing a toast per duplicate row.
+        try {
+          s.addCandidate(assembly.id, position.id, n, d);
+          added++;
+        } catch {
+          failed++;
+        }
+      }
+      notify(added ? `Added ${added} candidate(s)${failed ? `; ${failed} could not be added` : ''}.` : 'No candidates found in that file.', added ? 'success' : 'error');
+    } catch (e) {
+      notify(`Could not read that file: ${(e as Error).message}`, 'error');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
   const add = () => {
+    // Accept a pasted list: "Ann R., Bob T.; Cy W." as well as one name at a time.
     const parts = name
-      .split(/[\n;]+/)
+      .split(/[\n;,]+/)
       .map((x) => x.trim())
       .filter(Boolean);
+    const failed: string[] = [];
     let added = 0;
     for (const part of parts) {
       if (attempt(() => s.addCandidate(assembly.id, position.id, part, parts.length === 1 ? district : undefined))) added++;
+      else failed.push(part);
     }
-    if (added) {
-      setName('');
-      setDistrict('');
-    }
+    // Keep whatever could not be added in the box so nothing is lost.
+    setName(failed.join('; '));
+    if (added && !failed.length) setDistrict('');
   };
 
   const start = async () => {
@@ -114,7 +155,21 @@ export function CandidateSetup({ assembly, position }: { assembly: Assembly; pos
                 >
                   ↓
                 </button>
-                <button className="outline danger" onClick={() => s.removeCandidate(assembly.id, position.id, c.id)} aria-label={`Remove ${c.name}`}>
+                <button
+                  className="outline danger"
+                  aria-label={`Remove ${c.name}`}
+                  onClick={async () => {
+                    if (
+                      await confirmAction({
+                        title: `Remove ${c.name} from the list?`,
+                        body: <p>Use this when someone is unable to serve. Their name will not appear on the board or the ballots.</p>,
+                        confirmLabel: 'Remove',
+                        danger: true,
+                      })
+                    )
+                      s.removeCandidate(assembly.id, position.id, c.id);
+                  }}
+                >
                   ✕
                 </button>
               </div>
@@ -136,6 +191,17 @@ export function CandidateSetup({ assembly, position }: { assembly: Assembly; pos
           </button>
         </div>
       )}
+
+      <div className="row wrap">
+        <button className="outline secondary mini" onClick={() => fileRef.current?.click()}>
+          Import list (CSV)
+        </button>
+        <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => importCsv(e.target.files?.[0])} />
+        <button className="outline secondary mini" onClick={() => saveCsv(candidateTemplate(), 'candidate-list-template.csv')}>
+          Download template
+        </button>
+        <small className="muted">Columns: Name, District, Note. Useful when the eligibility list is prepared in advance.</small>
+      </div>
 
       {others.length > 0 && (
         <div className="row">

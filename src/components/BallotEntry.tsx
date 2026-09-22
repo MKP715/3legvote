@@ -4,11 +4,13 @@ import { ordinal, pct, RULE_LABEL, tallyBallot } from '../engine/thirdLegacy';
 import { effectiveVoters, emptyDraft, useStore } from '../store';
 import { listNames, nameOf } from '../announce';
 import { ballotColor } from '../presets';
-import { attempt, Badge, confirmAction, notify, NumberField } from './ui';
+import { attempt, Badge, confirmAction, isConfirmOpen, notify, NumberField } from './ui';
 import { TellerPanel } from './TellerPanel';
 
 type Mode = 'totals' | 'tally';
 const INVALID = '__invalid__';
+/** Shared placeholder: a new draft object per render would change the teller key every time. */
+const BLANK_DRAFT: DraftBallot = Object.freeze(emptyDraft()) as DraftBallot;
 
 function readMode(): Mode {
   try {
@@ -33,11 +35,12 @@ export function BallotEntry({
 }) {
   const setDraft = useStore((s) => s.setDraft);
   const recordBallot = useStore((s) => s.recordBallot);
+  const clearDraftCounts = useStore((s) => s.clearDraftCounts);
   const setLiveStatus = useStore((s) => s.setLiveStatus);
   const voters = effectiveVoters(assembly);
   const color = ballotColor(assembly.ballotColors, number);
   const liveHere = assembly.livePositionId === position.id;
-  const draft: DraftBallot = position.draft ?? emptyDraft();
+  const draft: DraftBallot = position.draft ?? BLANK_DRAFT;
   const options = useMemo(() => (isConfirmation ? [...activeIds, AGAINST] : activeIds), [activeIds, isConfirmation]);
   const [mode, setModeState] = useState<Mode>(readMode);
   const [tallyChannel, setTallyChannel] = useState<Channel>('inPerson');
@@ -112,6 +115,9 @@ export function BallotEntry({
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // A confirmation is on screen (e.g. "Record this ballot?") — the counts shown there must
+      // not change underneath it.
+      if (isConfirmOpen()) return;
       if (/^[1-9]$/.test(e.key)) {
         const idx = Number(e.key) - 1;
         if (idx < options.length) {
@@ -199,9 +205,25 @@ export function BallotEntry({
   };
 
   const onClear = async () => {
-    if (await confirmAction({ title: 'Clear all counts for this ballot?', danger: true, confirmLabel: 'Clear' })) {
-      setDraft(assembly.id, position.id, null);
-    }
+    const reports = draft.tellerReports?.length ?? 0;
+    const ok = await confirmAction({
+      title: 'Clear all counts for this ballot?',
+      danger: true,
+      confirmLabel: 'Clear counts',
+      body: (
+        <>
+          <p>
+            Every number on this ballot goes back to zero
+            {reports > 0 ? `, and ${reports} teller/poll report${reports === 1 ? '' : 's'} already added will be removed` : ''}.
+          </p>
+          <p className="sub muted">
+            Teller links and QR codes keep working, so tellers do not need to scan again. Anything they have already counted on their own phone is
+            still on their phone.
+          </p>
+        </>
+      ),
+    });
+    if (ok) attempt(() => clearDraftCounts(assembly.id, position.id), 'Counts cleared.');
   };
 
   const pollText = [
@@ -245,10 +267,10 @@ export function BallotEntry({
           )}
         </h3>
         <div role="group" className="mode-toggle">
-          <button className={mode === 'totals' ? '' : 'outline secondary'} onClick={() => setMode('totals')}>
+          <button className={mode === 'totals' ? '' : 'outline secondary'} aria-pressed={mode === 'totals'} onClick={() => setMode('totals')}>
             Enter totals
           </button>
-          <button className={mode === 'tally' ? '' : 'outline secondary'} onClick={() => setMode('tally')}>
+          <button className={mode === 'tally' ? '' : 'outline secondary'} aria-pressed={mode === 'tally'} onClick={() => setMode('tally')}>
             Click tally
           </button>
         </div>
@@ -287,7 +309,12 @@ export function BallotEntry({
         <section className="tally">
           <div role="group" className="channel-toggle">
             {CHANNELS.map((ch) => (
-              <button key={ch} className={tallyChannel === ch ? '' : 'outline secondary'} onClick={() => setTallyChannel(ch)}>
+              <button
+                key={ch}
+                className={tallyChannel === ch ? '' : 'outline secondary'}
+                aria-pressed={tallyChannel === ch}
+                onClick={() => setTallyChannel(ch)}
+              >
                 Counting: {CHANNEL_LABEL[ch]} ({preview.cast[ch]})
               </button>
             ))}
@@ -310,6 +337,9 @@ export function BallotEntry({
             <small className="muted">
               Keys: 1–{Math.min(9, options.length)} vote · 0 invalid · Backspace/Z undo · I / V switch channel
             </small>
+            <span className="tally-running" aria-live="polite">
+              {CHANNEL_LABEL[tallyChannel]} counted: <strong>{preview.cast[tallyChannel]}</strong>
+            </span>
             <button className="outline secondary" onClick={undoTap} disabled={!draft.tallyLog.length}>
               Undo last tap
             </button>

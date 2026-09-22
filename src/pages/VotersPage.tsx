@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import Papa from 'papaparse';
-import { saveAs } from 'file-saver';
 import { nanoid } from 'nanoid';
 import { useAssembly, useStore } from '../store';
 import { CHANNEL_LABEL, CHANNELS, type Channel, type VoterRole } from '../engine/types';
-import { computeEligibility, regionalTrusteeBalance, rollFromRows } from '../engine/voters';
+import { computeEligibility, regionalTrusteeBalance, rollFromRows, type RollImport } from '../engine/voters';
 import { PRESETS } from '../presets';
-import { Badge, confirmAction, notify } from '../components/ui';
+import { ROLL_COLUMN_HELP, saveCsv, voterRollTemplate } from '../templates';
+import { Badge, choose, confirmAction, notify } from '../components/ui';
 import { NotFound } from './NotFound';
 
 /**
@@ -21,6 +21,7 @@ export function VotersPage() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'all' | 'present' | 'absent' | Channel>('all');
   const [form, setForm] = useState({ name: '', roleId: '', group: '', district: '', channel: 'inPerson' as Channel, present: true });
+  const [importInfo, setImportInfo] = useState<RollImport | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const el = useMemo(() => (a ? computeEligibility(a.voterRoll, a.roles) : null), [a]);
@@ -47,24 +48,48 @@ export function VotersPage() {
 
   const onImport = async (f: File | undefined) => {
     if (!f) return;
-    const text = await f.text();
-    const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: 'greedy' });
-    const voters = rollFromRows(parsed.data, a.roles, () => nanoid(8));
-    if (!voters.length) {
-      notify('No names found. The CSV needs a header row with at least a “Name” column.', 'error');
-      return;
+    try {
+      const text = (await f.text()).replace(/^\uFEFF/, '');
+      const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: 'greedy' });
+      const result = rollFromRows(parsed.data, a.roles, () => nanoid(8));
+      if (!result.voters.length) {
+        notify('No names found. The file needs a header row with at least a “Name” column — download the template to see the format.', 'error');
+        return;
+      }
+      let replace = false;
+      if (a.voterRoll.length > 0) {
+        const choice = await choose({
+          title: `Import ${result.voters.length} names`,
+          body: (
+            <>
+              <p>
+                This roll already has {a.voterRoll.length} name(s). Replace them with the file, or add the file’s names to what is already here?
+              </p>
+              <p className="sub muted">Columns used: {result.usedColumns.join(', ') || 'none recognised'}.</p>
+            </>
+          ),
+          options: [
+            { value: 'replace', label: 'Replace the roll', danger: true },
+            { value: 'add', label: 'Add to the roll' },
+          ],
+        });
+        if (!choice) return; // Cancel / Escape does nothing at all
+        replace = choice === 'replace';
+      }
+      s.importVoters(a.id, result.voters, replace);
+      setImportInfo(result);
+      const problems = result.unmatchedRoles.length + result.duplicateNames.length + result.skipped;
+      notify(
+        problems
+          ? `Imported ${result.voters.length} names — ${problems} thing(s) to check below.`
+          : `Imported ${result.voters.length} names.`,
+        problems ? 'info' : 'success',
+      );
+    } catch (e) {
+      notify(`Could not read that file: ${(e as Error).message}`, 'error');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
     }
-    const replace =
-      a.voterRoll.length > 0 &&
-      (await confirmAction({
-        title: `Import ${voters.length} names`,
-        body: <p>Replace the existing roll of {a.voterRoll.length}? Choose Cancel to add these names to it instead.</p>,
-        confirmLabel: 'Replace roll',
-        danger: true,
-      }));
-    s.importVoters(a.id, voters, replace);
-    notify(`Imported ${voters.length} names.`, 'success');
-    if (fileRef.current) fileRef.current.value = '';
   };
 
   const exportRoll = () => {
@@ -79,15 +104,23 @@ export function VotersPage() {
       'Checked in': v.checkedInAt ? new Date(v.checkedInAt).toLocaleString() : '',
       Voting: eligibleIds.has(v.id) ? 'yes' : v.present ? `no — ${exclusion.get(v.id) ?? ''}` : '',
     }));
-    saveAs(new Blob([Papa.unparse(rows)], { type: 'text/csv;charset=utf-8' }), `${a.name.replace(/[^\w]+/g, '-')}-roll-call.csv`);
+    saveCsv(rows, `${a.name.replace(/[^\w]+/g, '-')}-roll-call.csv`);
   };
 
   const template = () => {
-    const csv = Papa.unparse([
-      { Name: 'Jane D.', Role: 'GSR', Group: 'Tuesday Night Step', District: '5', Email: '', Channel: 'In-person', Present: '' },
-      { Name: 'Sam P.', Role: 'Alternate GSR', Group: 'Tuesday Night Step', District: '5', Email: '', Channel: 'Virtual', Present: '' },
-    ]);
-    saveAs(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'voter-roll-template.csv');
+    saveCsv(voterRollTemplate(a), 'voter-roll-template.csv');
+    notify('Template downloaded — it is filled with example rows for this election’s roles.', 'success');
+  };
+
+  const addMissingRoles = () => {
+    const have = new Set(a.roles.map((r) => r.id));
+    const missing = PRESETS[a.electionType].roles.filter((r) => !have.has(r.id));
+    if (!missing.length) {
+      notify('All the roles for this type of election are already listed.', 'info');
+      return;
+    }
+    setRoles([...a.roles, ...structuredClone(missing)]);
+    notify(`Added: ${missing.map((r) => r.name).join(', ')}.`, 'success');
   };
 
   const setRoles = (roles: VoterRole[]) => s.setRoles(a.id, roles);
@@ -145,7 +178,7 @@ export function VotersPage() {
             </button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => onImport(e.target.files?.[0])} />
             <button className="outline secondary" onClick={template}>
-              CSV template
+              Download template
             </button>
             <button className="outline secondary" onClick={exportRoll} disabled={!a.voterRoll.length}>
               Export attendance
@@ -162,6 +195,55 @@ export function VotersPage() {
             </button>
           </div>
         </header>
+
+        <details className="panel-lite">
+          <summary>How to prepare the file before you import</summary>
+          <p className="muted small">
+            Any spreadsheet works — export it as CSV (Excel: <em>File → Save As → CSV UTF-8</em>; Google Sheets: <em>File → Download → CSV</em>). The
+            first row must be the column names. Extra columns are ignored, so a registrar’s existing list usually imports as it is. Download the
+            template to see a filled-in example for this election.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Column</th>
+                <th>What to put in it</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROLL_COLUMN_HELP.map(([col, help]) => (
+                <tr key={col}>
+                  <td>
+                    <strong>{col}</strong>
+                  </td>
+                  <td className="sub">{help}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted small">Roles available in this election: {a.roles.map((r) => r.name).join(' · ')}.</p>
+        </details>
+
+        {importInfo && (importInfo.unmatchedRoles.length > 0 || importInfo.duplicateNames.length > 0 || importInfo.skipped > 0) && (
+          <div className="warn-box">
+            <strong>Check the import:</strong>
+            <ul>
+              {importInfo.unmatchedRoles.length > 0 && (
+                <li>
+                  Role{importInfo.unmatchedRoles.length > 1 ? 's' : ''} not recognised: {importInfo.unmatchedRoles.join(', ')} — those people were given
+                  “{importInfo.fallbackRole}”. Set their role in the table below, or add the role under “Roles &amp; voting rights”.
+                </li>
+              )}
+              {importInfo.duplicateNames.length > 0 && (
+                <li>Listed more than once: {importInfo.duplicateNames.join(', ')}. One person has one vote — remove the extra rows.</li>
+              )}
+              {importInfo.skipped > 0 && <li>{importInfo.skipped} row(s) had no name and were skipped.</li>}
+            </ul>
+            <button className="outline mini" onClick={() => setImportInfo(null)}>
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <form
           className="roll-add"
@@ -269,7 +351,22 @@ export function VotersPage() {
                       )}
                     </td>
                     <td>
-                      <button className="outline danger mini" onClick={() => s.removeVoter(a.id, v.id)} aria-label={`Remove ${v.name}`}>
+                      <button
+                        className="outline danger mini"
+                        aria-label={`Remove ${v.name}`}
+                        onClick={async () => {
+                          if (
+                            !v.present ||
+                            (await confirmAction({
+                              title: `Remove ${v.name} from the roll?`,
+                              body: <p>They are checked in, so this changes the number of eligible voters.</p>,
+                              confirmLabel: 'Remove',
+                              danger: true,
+                            }))
+                          )
+                            s.removeVoter(a.id, v.id);
+                        }}
+                      >
                         ✕
                       </button>
                     </td>
@@ -284,15 +381,26 @@ export function VotersPage() {
       <article>
         <header className="row-between wrap">
           <h3 style={{ margin: 0 }}>Roles &amp; voting rights</h3>
-          <button
-            className="outline secondary"
-            onClick={async () => {
-              if (await confirmAction({ title: 'Reset roles to the preset?', body: <p>Voters with a removed role will need a new role.</p>, confirmLabel: 'Reset' }))
-                setRoles(structuredClone(PRESETS[a.electionType].roles));
-            }}
-          >
-            Reset to “{PRESETS[a.electionType].label}”
-          </button>
+          <div className="row wrap">
+            <button className="outline" onClick={addMissingRoles}>
+              Add missing roles
+            </button>
+            <button
+              className="outline secondary"
+              onClick={async () => {
+                if (
+                  await confirmAction({
+                    title: 'Reset roles to the preset?',
+                    body: <p>Voters with a removed role will need a new role.</p>,
+                    confirmLabel: 'Reset',
+                  })
+                )
+                  setRoles(structuredClone(PRESETS[a.electionType].roles));
+              }}
+            >
+              Reset to “{PRESETS[a.electionType].label}”
+            </button>
+          </div>
         </header>
         <p className="muted small">Voting rights vary between areas — set them to match your guidelines. An alternate votes only when the primary for the same group/district is absent.</p>
         <table>
@@ -311,8 +419,9 @@ export function VotersPage() {
                 <td>
                   <input
                     type="text"
-                    defaultValue={r.name}
-                    onBlur={(e) => setRoles(a.roles.map((x, j) => (j === i ? { ...x, name: e.target.value.trim() || x.name } : x)))}
+                    value={r.name}
+                    onChange={(e) => setRoles(a.roles.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                    onBlur={(e) => !e.target.value.trim() && setRoles(a.roles.map((x, j) => (j === i ? { ...x, name: `Role ${i + 1}` } : x)))}
                     aria-label="Role name"
                   />
                 </td>

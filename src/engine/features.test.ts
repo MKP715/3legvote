@@ -73,9 +73,75 @@ describe('voter eligibility', () => {
       roles,
       () => `id${n++}`,
     );
-    expect(out).toHaveLength(2);
-    expect(out[0]).toMatchObject({ name: 'Jane', roleId: 'gsr', channel: 'virtual', present: true, group: 'Hope' });
-    expect(out[1]).toMatchObject({ roleId: 'altgsr', channel: 'inPerson', present: false });
+    expect(out.voters).toHaveLength(2);
+    expect(out.skipped).toBe(1);
+    expect(out.voters[0]).toMatchObject({ name: 'Jane', roleId: 'gsr', channel: 'virtual', present: true, group: 'Hope' });
+    expect(out.voters[1]).toMatchObject({ roleId: 'altgsr', channel: 'inPerson', present: false });
+  });
+
+  it('matches common service titles to roles, including officers', () => {
+    let n = 0;
+    const rows = [
+      { Name: 'A', 'Service position': 'Area Chair' },
+      { Name: 'B', 'Service position': 'Treasurer' },
+      { Name: 'C', 'Service position': 'Alt. GSR' },
+      { Name: 'D', 'Service position': 'District Committee Member' },
+      { Name: 'E', 'Service position': 'Officer' },
+      { Name: 'F', 'Service position': 'Corrections Committee Chair' },
+      { Name: 'G', 'Service position': 'Past Delegate' },
+      { Name: 'H', 'Service position': 'Trusted Servant of Everything' },
+    ];
+    const out = rollFromRows(rows, roles, () => `id${n++}`);
+    expect(out.voters.map((v) => v.roleId)).toEqual(['officer', 'officer', 'altgsr', 'dcm', 'officer', 'chair', 'pastdel', 'gsr']);
+    expect(out.unmatchedRoles).toEqual(['Trusted Servant of Everything']);
+    expect(out.usedColumns).toContain('Service position');
+  });
+
+  it('officers are voting members in every election type that has them', () => {
+    for (const key of ['area', 'district', 'areaTrusteeCandidate', 'intergroup', 'custom'] as const) {
+      const officer = PRESETS[key].roles.find((r) => r.id === 'officer');
+      expect(officer, `${key} has an officer role`).toBeTruthy();
+      expect(officer!.votes, `${key} officer votes`).toBe(true);
+    }
+    // An officer who is present is counted as a voter.
+    const el = computeEligibility([v('Chair person', 'officer')], roles);
+    expect(el.total).toBe(1);
+  });
+
+  it('lets two members with the same name vote when their emails differ', () => {
+    const el = computeEligibility(
+      [v('John S.', 'gsr', { group: 'Hope', email: 'john1@example.org' }), v('John S', 'gsr', { group: 'Serenity', email: 'john2@example.org' })],
+      roles,
+    );
+    expect(el.total).toBe(2);
+  });
+
+  it('still counts one vote for the same person listed twice, and says how to fix a clash', () => {
+    const el = computeEligibility([v('John S.', 'gsr', { group: 'Hope' }), v('John S', 'dcm', { group: 'District 2' })], roles);
+    expect(el.total).toBe(1);
+    expect(el.excluded[0].reason).toMatch(/add an email address/i);
+  });
+
+  it('an alternate with no group cannot be paired, so is not given a vote by default', () => {
+    const el = computeEligibility([v('A GSR', 'gsr', { group: '' }), v('An alternate', 'altgsr', { group: '' })], roles);
+    expect(el.total).toBe(1);
+    expect(el.excluded[0].reason).toMatch(/no group or district/i);
+  });
+
+  it('a member voting under a primary role does not block their group’s alternate', () => {
+    // Pat is listed as both DCM and GSR for the same group; they vote once (as DCM),
+    // so the group's alternate GSR still votes in place of the GSR.
+    const el = computeEligibility(
+      [v('Pat M.', 'dcm', { group: 'Hope' }), v('Pat M.', 'gsr', { group: 'Hope' }), v('Chris B.', 'altgsr', { group: 'Hope' })],
+      roles,
+    );
+    expect(el.eligible.map((x) => `${x.name}/${x.roleId}`).sort()).toEqual(['Chris B./altgsr', 'Pat M./dcm']);
+  });
+
+  it('flags people listed twice in an imported file', () => {
+    let n = 0;
+    const out = rollFromRows([{ Name: 'Ann B.' }, { Name: 'ann b.' }], roles, () => `id${n++}`);
+    expect(out.duplicateNames).toEqual(['ann b.']);
   });
 });
 
@@ -84,6 +150,58 @@ describe('virtual poll import', () => {
     { id: 'a', name: 'Pat M.' },
     { id: 'b', name: 'Chris R.' },
   ];
+
+  it('counts an unrecognised first answer as invalid instead of dropping it', () => {
+    const csv = ['Name,Email,Answer', 'Ann,a@x,Someone Else', 'Bob,b@x,Pat M.', 'Cy,c@x,Chris R.'].join('\n');
+    const r = parsePoll(csv, opts);
+    expect(r.answerColumn).toBe('Answer'); // the header is still identified correctly
+    expect(r.responses).toBe(3);
+    expect(r.votes).toEqual({ a: 1, b: 1 });
+    expect(r.invalid).toBe(1);
+    expect(r.unmatched).toEqual(['Someone Else']);
+  });
+
+  it('does not collapse votes when the poll is anonymous', () => {
+    const rows = Array.from({ length: 12 }, (_, i) => `${i + 1},Anonymous Attendee,,10:0${i},${i % 2 ? 'Pat M.' : 'Chris R.'}`);
+    const csv = ['#,User Name,User Email,Submitted Date/Time,Delegate — 1st ballot', ...rows].join('\n');
+    const r = parsePoll(csv, opts);
+    expect(r.votes).toEqual({ a: 6, b: 6 });
+    expect(r.dedupeDisabled).toBe(true);
+    expect(r.duplicatesRemoved).toBe(0);
+    expect(r.dedupeNote).toMatch(/anonymous/i);
+  });
+
+  it('warns when the file cannot identify participants at all', () => {
+    const r = parsePoll('Answer\nPat M.\nPat M.\nChris R.', opts);
+    expect(r.votes).toEqual({ a: 2, b: 1 });
+    expect(r.dedupeDisabled).toBe(true);
+    expect(r.identityColumn).toBeNull();
+  });
+
+  it('picks the question whose answers match this ballot, and flags the choice', () => {
+    const csv = [
+      'Name,Email,Question,Answer',
+      'Ann,a@x,Area Chair — 1st ballot,Taylor B.',
+      'Bob,b@x,Area Chair — 1st ballot,Morgan L.',
+      'Ann,a@x,Delegate — 2nd ballot,Pat M.',
+      'Bob,b@x,Delegate — 2nd ballot,Chris R.',
+    ].join('\n');
+    const r = parsePoll(csv, opts);
+    expect(r.question).toBe('Delegate — 2nd ballot');
+    expect(r.votes).toEqual({ a: 1, b: 1 });
+    expect(r.questionAmbiguous).toBe(true);
+    const chosen = parsePoll(csv, opts, { question: 'Area Chair — 1st ballot' });
+    expect(chosen.questionAmbiguous).toBe(false);
+    expect(chosen.invalid).toBe(2); // neither name is on this ballot
+  });
+
+  it('gives the same signature for the same file and a different one when the votes differ', () => {
+    const a1 = parsePoll('Name,Answer\nAnn,Pat M.\nBob,Chris R.', opts);
+    const a2 = parsePoll('Name,Answer\nAnn,Pat M.\nBob,Chris R.', opts);
+    const b = parsePoll('Name,Answer\nAnn,Pat M.\nBob,Pat M.', opts);
+    expect(a1.signature).toBe(a2.signature);
+    expect(a1.signature).not.toBe(b.signature);
+  });
 
   it('reads a Zoom-style poll report with header junk and counts one response per participant', () => {
     const csv = [
@@ -132,6 +250,26 @@ describe('virtual poll import', () => {
       { id: AGAINST, name: 'No' },
     ]);
     expect(r.votes).toEqual({ a: 3, [AGAINST]: 1 });
+  });
+
+  it('does not read a comment as a "yes" vote on a confirmation ballot', () => {
+    const csv = 'Name,Answer\nA,Yes\nB,No\nC,Comfortable with the candidate\nD,Before we vote I want to say something';
+    const r = parsePoll(csv, [
+      { id: 'a', name: 'Pat M.' },
+      { id: AGAINST, name: 'No' },
+    ]);
+    expect(r.votes).toEqual({ a: 1, [AGAINST]: 1 });
+    expect(r.invalid).toBe(2);
+  });
+
+  it('prefers the answer column over a participant-name column that happens to match', () => {
+    // Candidates are voting members, so their names also appear in the "User Name" column —
+    // both columns match the same number of times and the answer column must win.
+    const csv = ['#,User Name,Answer', '1,Pat M.,Chris R.', '2,Chris R.,Pat M.'].join('\n');
+    const r = parsePoll(csv, opts);
+    expect(r.columns.map((c) => c.hits)).toEqual([2, 2]);
+    expect(r.answerColumn).toBe('Answer');
+    expect(r.votes).toEqual({ a: 1, b: 1 });
   });
 
   it('errors when no candidate names are found', () => {

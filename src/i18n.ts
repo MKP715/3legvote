@@ -3,7 +3,7 @@
  * the opening explanation of the procedure, and the projector display. (The operator screens
  * stay in English.)
  */
-import type { ElectionMethod, Language, WithdrawalRule } from './engine/types';
+import type { ElectionMethod, ElectionType, Language, WithdrawalRule } from './engine/types';
 
 export const LANGUAGES: Record<Language, string> = { en: 'English', es: 'Español', fr: 'Français' };
 
@@ -377,6 +377,38 @@ const FR: Dict = {
     'Les candidats peuvent se retirer à tout moment. Y a-t-il une personne inscrite qui ne peut pas servir ?',
   ],
 };
+
+/**
+ * Who votes, in the language the chair is reading. English comes from the presets; these are
+ * the same sentences for the Spanish and French opening scripts.
+ */
+const WHO_VOTES: Record<Exclude<Language, 'en'>, Record<ElectionType, string>> = {
+  es: {
+    area: 'los RSG, los MCD y los miembros del comité de área — incluidos los oficiales del área — según las guías del área. Los suplentes votan solo cuando la persona a la que sustituyen está ausente.',
+    district: 'los RSG de los grupos del distrito, y los oficiales del distrito cuando las guías del distrito les dan voto (los RSG suplentes votan cuando su RSG está ausente).',
+    areaTrusteeCandidate: 'los miembros votantes de la asamblea de área (RSG, MCD y miembros del comité de área, incluidos los oficiales).',
+    regionalTrustee:
+      'los delegados de la región, más un número igual de votantes — la mitad del Comité de Custodios de la Conferencia y la mitad del Comité de Nombramientos de los custodios.',
+    trusteeAtLarge: 'todos los delegados del país que nomina (EE. UU. o Canadá) y todos los miembros del Comité de Nombramientos de los custodios.',
+    intergroup: 'los representantes de intergrupo y los miembros del comité directivo (los suplentes votan cuando su representante está ausente).',
+    custom: 'los miembros votantes según las guías de esta entidad de servicio.',
+  },
+  fr: {
+    area: 'les RSG, les MCD et les membres du comité de région — y compris les officiers — selon les lignes de conduite de la région. Un substitut ne vote que si la personne qu’il remplace est absente.',
+    district: 'les RSG des groupes du district, et les officiers du district lorsque les lignes de conduite leur accordent un vote (le RSG substitut vote si le RSG est absent).',
+    areaTrusteeCandidate: 'les membres votants de l’assemblée régionale (RSG, MCD et membres du comité de région, y compris les officiers).',
+    regionalTrustee:
+      'les délégués de la région, plus un nombre égal de votants — une moitié du comité des Serviteurs de confiance de la Conférence et une moitié du comité des mises en candidature des Serviteurs de confiance.',
+    trusteeAtLarge:
+      'tous les délégués du pays qui propose (États-Unis ou Canada) et tous les membres du comité des mises en candidature des Serviteurs de confiance.',
+    intergroup: 'les représentants d’intergroupe et les membres du comité directeur (un substitut vote si son représentant est absent).',
+    custom: 'les membres votants définis par les lignes de conduite de cette entité de service.',
+  },
+};
+
+export function whoVotesL(type: ElectionType, lang: Language, english: string): string {
+  return lang === 'en' ? english : (WHO_VOTES[lang]?.[type] ?? english);
+}
 
 export const DICTS: Record<Language, Dict> = { en: EN, es: ES, fr: FR };
 export const t = (lang: Language | undefined): Dict => DICTS[lang ?? 'en'] ?? EN;

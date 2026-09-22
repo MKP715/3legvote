@@ -3,7 +3,7 @@ import type { Assembly } from '../engine/types';
 import { openingScript } from '../announce';
 import { PRESETS } from '../presets';
 import { useStore } from '../store';
-import { LANGUAGES } from '../i18n';
+import { LANGUAGES, whoVotesL } from '../i18n';
 
 /**
  * Service Manual Appendix D, step 5: "Chairperson reviews the election procedure and the area's
@@ -14,7 +14,7 @@ export function OpeningScript({ assembly, title, open = false }: { assembly: Ass
   const s = useStore();
   // Only the initial state comes from the prop, so ticking an approval doesn't collapse the panel.
   const [isOpen, setIsOpen] = useState(open);
-  const whoVotes = PRESETS[assembly.electionType].whoVotes;
+  const whoVotes = whoVotesL(assembly.electionType, assembly.language, PRESETS[assembly.electionType].whoVotes);
   const lines = openingScript(title, whoVotes, assembly.ballotColors, assembly.language);
   const ap = assembly.approvals;
   const check = (key: keyof Assembly['approvals'], label: string) => (

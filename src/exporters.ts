@@ -3,6 +3,7 @@ import { saveAs } from 'file-saver';
 import { AGAINST, type Assembly } from './engine/types';
 import { computePosition, METHOD_LABEL, ordinal } from './engine/thirdLegacy';
 import { nameOf } from './announce';
+import { computeEligibility } from './engine/voters';
 
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'assembly';
@@ -72,10 +73,57 @@ export function summaryRows(a: Assembly) {
   });
 }
 
+/** Who was present and whether they had a vote (for the assembly's records). */
+export function attendanceRows(a: Assembly) {
+  const roleName = new Map(a.roles.map((r) => [r.id, r.name]));
+  const el = computeEligibility(a.voterRoll, a.roles);
+  const voting = new Set(el.eligible.map((v) => v.id));
+  const reason = new Map(el.excluded.map((x) => [x.voter.id, x.reason]));
+  return a.voterRoll
+    .filter((v) => v.present)
+    .map((v) => ({
+      Name: v.name,
+      Role: roleName.get(v.roleId) ?? '',
+      Group: v.group,
+      District: v.district,
+      Attending: v.channel === 'virtual' ? 'Virtual' : 'In-person',
+      Voting: voting.has(v.id) ? 'yes' : 'no',
+      'If not voting, why': voting.has(v.id) ? '' : (reason.get(v.id) ?? ''),
+      'Checked in': v.checkedInAt ? new Date(v.checkedInAt).toLocaleString() : '',
+    }));
+}
+
+/**
+ * One CSV with labelled sections: results summary, every ballot, attendance and the audit log.
+ * Starts with a BOM so Excel opens accented names correctly.
+ */
 export function exportCsv(a: Assembly): void {
+  const section = (title: string, rows: Record<string, string | number>[]) =>
+    rows.length ? `"${title}"\r\n${Papa.unparse(rows, { newline: '\r\n' })}\r\n\r\n` : `"${title}"\r\n"(none)"\r\n\r\n`;
+  const header = Papa.unparse(
+    [
+      {
+        Assembly: a.name,
+        Date: a.date,
+        Location: a.location,
+        Chair: a.chair,
+        'Election type': a.electionType,
+        Procedure: 'Third Legacy Procedure (A.A. Service Manual, Appendix G)',
+        'Total vote': a.settings.countInvalidInTotal ? 'includes blank/invalid ballots' : 'valid votes only',
+      },
+    ],
+    { newline: '\r\n' },
+  );
   const csv =
-    `${Papa.unparse(summaryRows(a))}\r\n\r\n${Papa.unparse(ballotRows(a))}\r\n\r\n` +
-    Papa.unparse(a.log.map((l) => ({ Time: l.at, Action: l.action, Detail: l.detail ?? '' })));
+    '﻿' +
+    `${header}\r\n\r\n` +
+    section('RESULTS', summaryRows(a)) +
+    section('BALLOTS', ballotRows(a)) +
+    section('ATTENDANCE', attendanceRows(a)) +
+    section(
+      'AUDIT LOG',
+      a.log.map((l) => ({ Time: new Date(l.at).toLocaleString(), Action: l.action, Detail: l.detail ?? '' })),
+    );
   saveAs(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${slug(a.name)}-${a.date || 'election'}-results.csv`);
 }
 

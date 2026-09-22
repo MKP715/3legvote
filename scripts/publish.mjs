@@ -17,13 +17,8 @@ if (!existsSync(join(dist, 'index.html'))) {
 // Never overwrite project sources, even if a build output happens to share a name.
 const PROTECTED = new Set(['src', 'scripts', 'public', 'node_modules', '.git', '.github', 'package.json', 'package-lock.json', 'README.md', 'LICENSE', 'tsconfig.json', 'vite.config.ts', '.gitignore']);
 
-if (existsSync(manifestPath)) {
-  for (const f of JSON.parse(readFileSync(manifestPath, 'utf8'))) {
-    if (PROTECTED.has(f.split('/')[0])) continue;
-    rmSync(join(root, f), { force: true, recursive: true });
-  }
-}
-
+// Work out what the new build contains BEFORE removing anything, so a failed build can
+// never leave the site without an index.html.
 const published = [];
 const walk = (dir) => {
   for (const name of readdirSync(dir)) {
@@ -37,6 +32,17 @@ walk(dist);
 const tops = [...new Set(published.map((f) => f.split('/')[0]))];
 for (const t of tops) {
   if (PROTECTED.has(t)) throw new Error(`Refusing to overwrite protected path: ${t}`);
+}
+
+// Remove what the previous build published, plus any stray hashed service-worker files.
+const previous = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : [];
+const strays = readdirSync(root).filter((f) => /^workbox-[\da-f]+\.js$/.test(f) && !tops.includes(f));
+for (const f of [...previous, ...strays]) {
+  if (PROTECTED.has(f.split('/')[0])) continue;
+  rmSync(join(root, f), { force: true, recursive: true });
+}
+
+for (const t of tops) {
   cpSync(join(dist, t), join(root, t), { recursive: true });
 }
 writeFileSync(manifestPath, JSON.stringify(tops.sort(), null, 2) + '\n');

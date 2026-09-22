@@ -5,7 +5,7 @@ import { computePosition } from '../engine/thirdLegacy';
 import type { ElectionType, Voter } from '../engine/types';
 import { PRESETS } from '../presets';
 import { exportAllJson, readJsonFile } from '../exporters';
-import { attempt, confirmAction, notify } from '../components/ui';
+import { attempt, choose, confirmAction, notify } from '../components/ui';
 
 export function Home() {
   const assemblies = useStore((s) => s.assemblies);
@@ -63,7 +63,16 @@ export function Home() {
       channel: i % 3 === 0 ? 'virtual' : 'inPerson',
       present: true,
     }));
-    roll.push({ id: 'vd1', name: 'DCM — District 1', roleId: dcm, group: 'District 1', district: '1', channel: 'inPerson', present: true });
+    const officer = roles.find((r) => r.id === 'officer')!.id;
+    const altgsr = roles.find((r) => r.id === 'altgsr')!.id;
+    roll.push(
+      { id: 'vd1', name: 'DCM — District 1', roleId: dcm, group: 'District 1', district: '1', channel: 'inPerson', present: true },
+      { id: 'vd2', name: 'DCM — District 2', roleId: dcm, group: 'District 2', district: '2', channel: 'virtual', present: true },
+      { id: 'vo1', name: 'Area Secretary', roleId: officer, group: 'Area', district: '', channel: 'inPerson', present: true },
+      { id: 'vo2', name: 'Area Treasurer', roleId: officer, group: 'Area', district: '', channel: 'inPerson', present: true },
+      // An alternate whose GSR is present: shown as not voting until the GSR leaves.
+      { id: 'va1', name: 'Alt GSR — Serenity', roleId: altgsr, group: 'Serenity', district: '1', channel: 'inPerson', present: true },
+    );
     s.importVoters(id, roll, true);
     nav(`/a/${id}`);
     notify('Demo assembly created. Try running the Delegate election.', 'success');
@@ -74,9 +83,38 @@ export function Home() {
     try {
       const raw = (await readJsonFile(f)) as { assemblies?: unknown[] };
       if (raw && Array.isArray(raw.assemblies)) {
-        let n = 0;
-        for (const a of raw.assemblies) if (attempt(() => s.importAssembly(a))) n++;
-        notify(`Restored ${n} assembl${n === 1 ? 'y' : 'ies'} from the backup.`, 'success');
+        let restored = 0;
+        let skipped = 0;
+        for (const item of raw.assemblies) {
+          const inc = item as { id?: string; name?: string; updatedAt?: string };
+          const existing = assemblies.find((x) => x.id === inc?.id);
+          if (existing) {
+            const when = (iso?: string) => (iso ? new Date(iso).toLocaleString() : 'unknown');
+            const choice = await choose({
+              title: `“${existing.name}” is already here`,
+              body: (
+                <p>
+                  In the backup: saved {when(inc.updatedAt)}. On this device: saved {when(existing.updatedAt)}.
+                </p>
+              ),
+              options: [
+                { value: 'replace', label: 'Use the backup', danger: true },
+                { value: 'both', label: 'Keep both' },
+                { value: 'skip', label: 'Keep what is here' },
+              ],
+            });
+            if (choice === 'skip' || !choice) {
+              skipped++;
+              continue;
+            }
+            if (choice === 'replace') s.deleteAssembly(existing.id);
+          }
+          if (attempt(() => s.importAssembly(item, existing ? false : undefined))) restored++;
+        }
+        notify(
+          `Restored ${restored} election${restored === 1 ? '' : 's'}${skipped ? `; ${skipped} left as ${skipped === 1 ? 'it was' : 'they were'}` : ''}.`,
+          'success',
+        );
       } else {
         let id = '';
         if (attempt(() => (id = s.importAssembly(raw)), 'Assembly imported.')) nav(`/a/${id}`);

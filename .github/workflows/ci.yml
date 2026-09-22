@@ -1,7 +1,7 @@
 name: Test and build
 
 # GitHub Pages serves the main branch root ("Deploy from a branch"), so the built site is
-# committed by `npm run build`. This workflow checks that tests pass and the app builds.
+# committed. This workflow runs the tests and checks that the committed build matches src/.
 on:
   push:
     branches: [main]
@@ -22,6 +22,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build:dist
-      - name: Check the published site is present
-        run: test -f index.html && test -f .nojekyll && ls assets/*.js >/dev/null
+      - run: npm run build
+      - name: The published site must be committed and up to date
+        run: |
+          test -f index.html
+          test -f .nojekyll
+          ls assets/*.js >/dev/null
+          if ! git diff --quiet -- index.html assets manifest.webmanifest .published.json; then
+            echo "::error::The built site at the repository root is out of date."
+            echo "Run 'npm run build' and commit the regenerated files."
+            git diff --stat -- index.html assets manifest.webmanifest .published.json
+            exit 1
+          fi

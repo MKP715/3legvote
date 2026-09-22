@@ -50,15 +50,19 @@ export function MotionPanel({ assembly, position, mode }: { assembly: Assembly; 
       confirmLabel: 'Record',
     });
     if (!ok) return;
-    attempt(() =>
-      recordMotion(assembly.id, position.id, {
-        kind,
-        hands: kind === 'noMotion' ? zero() : hands,
-        carried: kind === 'noMotion' ? false : result,
-        reconsideration,
-        minorityOpinionNote: reconsideration ? minority || undefined : undefined,
-      }),
+    const saved = attempt(
+      () =>
+        recordMotion(assembly.id, position.id, {
+          kind,
+          hands: kind === 'noMotion' ? zero() : hands,
+          carried: kind === 'noMotion' ? false : result,
+          reconsideration,
+          minorityOpinionNote: reconsideration ? minority || undefined : undefined,
+        }),
+      kind === 'noMotion' ? 'Recorded — the choice goes to the hat.' : `Motion ${result ? 'carried' : 'defeated'}.`,
     );
+    // Keep the hand counts on screen if it could not be recorded, so nobody has to count again.
+    if (!saved) return;
     setHands(zero());
     setMinority('');
     setShowReconsider(false);

@@ -11,6 +11,7 @@
  *   Conference Committee on Trustees and one-half from the trustees' Nominating Committee.
  */
 import type { Channel, Voter, VoterRole } from './types';
+import { ROLE_ALIASES } from '../presets';
 
 export interface Exclusion {
   voter: Voter;
@@ -23,6 +24,11 @@ export interface Eligibility {
   total: number;
   excluded: Exclusion[];
   present: number;
+}
+
+/** Key used to decide whether two rows are the same person (ignores punctuation and case). */
+export function personKey(s: string): string {
+  return normName(s).replace(/\./g, '').replace(/\s+/g, ' ').trim();
 }
 
 export function normName(s: string): string {
@@ -44,45 +50,74 @@ export function computeEligibility(roll: Voter[], roles: VoterRole[]): Eligibili
   const excluded: Exclusion[] = [];
   const eligible: Voter[] = [];
 
-  // Primaries present per (role, group) — used for alternates.
-  const primaryPresent = new Set<string>();
-  for (const v of present) {
-    const r = roleById.get(v.roleId);
-    if (r?.votes && !r.alternateFor) primaryPresent.add(`${r.id}|${groupKey(v)}`);
-  }
-
-  // Voting roles first so a person with several roles is counted under a primary role.
+  // Voting roles first, so someone holding a primary and an alternate role keeps the primary one.
   const ordered = [...present].sort((a, b) => {
     const ra = roleById.get(a.roleId);
     const rb = roleById.get(b.roleId);
     return Number(!!ra?.alternateFor) - Number(!!rb?.alternateFor);
   });
 
+  // Pass 1: everyone with a voting primary role, one vote per person.
+  // An email address identifies a person; without one, the name does. Two different people
+  // with the same name and no email cannot be told apart, so the second is held back and the
+  // registrar is told how to fix it.
   const seen = new Map<string, Voter>();
+  const identity = (v: Voter) => (v.email ? `e:${personKey(v.email)}` : `n:${personKey(v.name)}`);
+  const alternates: Voter[] = [];
   for (const v of ordered) {
     const r = roleById.get(v.roleId);
     if (!r) {
-      excluded.push({ voter: v, reason: 'Unknown role' });
+      excluded.push({ voter: v, reason: 'Unknown role — set one in the table' });
       continue;
     }
     if (!r.votes) {
       excluded.push({ voter: v, reason: `${r.name} — non-voting` });
       continue;
     }
-    if (r.alternateFor && groupKey(v) && primaryPresent.has(`${r.alternateFor}|${groupKey(v)}`)) {
-      const pr = roleById.get(r.alternateFor);
-      excluded.push({ voter: v, reason: `${pr?.name ?? 'Primary'} for ${v.group || v.district} is present` });
-      continue;
-    }
-    const idKey = v.email ? `e:${normName(v.email)}` : `n:${normName(v.name)}`;
-    const nameKey = `n:${normName(v.name)}`;
-    const dup = seen.get(idKey) ?? seen.get(nameKey);
+    const dup = seen.get(identity(v));
     if (dup) {
-      excluded.push({ voter: v, reason: `Already voting as ${roleById.get(dup.roleId)?.name ?? 'another role'} (one person, one vote)` });
+      const sameName = personKey(dup.name) === personKey(v.name);
+      excluded.push({
+        voter: v,
+        reason: sameName
+          ? `Already voting as ${roleById.get(dup.roleId)?.name ?? 'another role'} (one person, one vote). If this is a different member with the same name, add an email address to tell them apart.`
+          : 'Already voting under another entry (one person, one vote)',
+      });
       continue;
     }
-    seen.set(idKey, v);
-    seen.set(nameKey, v);
+    if (r.alternateFor) {
+      alternates.push(v);
+      continue;
+    }
+    seen.set(identity(v), v);
+    eligible.push(v);
+  }
+
+  // Pass 2: alternates vote only when the primary for their group is not already voting.
+  const primaryVoting = new Set<string>();
+  for (const v of eligible) {
+    const r = roleById.get(v.roleId);
+    if (r && !r.alternateFor) primaryVoting.add(`${r.id}|${groupKey(v)}`);
+  }
+  for (const v of alternates) {
+    const r = roleById.get(v.roleId)!;
+    const key = groupKey(v);
+    const primaryName = roleById.get(r.alternateFor!)?.name ?? 'the primary';
+    if (!key) {
+      excluded.push({ voter: v, reason: `No group or district listed, so this alternate cannot be paired with ${primaryName} — fill in the group` });
+      continue;
+    }
+    if (primaryVoting.has(`${r.alternateFor}|${key}`)) {
+      excluded.push({ voter: v, reason: `${primaryName} for ${v.group || v.district} is present` });
+      continue;
+    }
+    const dup = seen.get(identity(v));
+    if (dup) {
+      excluded.push({ voter: v, reason: 'Already voting under another entry (one person, one vote)' });
+      continue;
+    }
+    seen.set(identity(v), v);
+    primaryVoting.add(`${r.alternateFor}|${key}`);
     eligible.push(v);
   }
 
@@ -122,38 +157,105 @@ export function regionalTrusteeBalance(eligible: Voter[], roles: VoterRole[]): T
   return { delegates, conferenceTrustees, trusteesNominating, ok, message };
 }
 
-/** Parse a voter roll from CSV rows (header row required). Unknown roles map to the first voting role. */
-export function rollFromRows(rows: Record<string, string>[], roles: VoterRole[], makeId: () => string): Voter[] {
-  const pick = (r: Record<string, string>, ...keys: string[]) => {
+export interface RollImport {
+  voters: Voter[];
+  /** Role names in the file that could not be matched (those rows got the fallback role). */
+  unmatchedRoles: string[];
+  /** Rows skipped because they had no name. */
+  skipped: number;
+  /** Names that appear more than once in the file. */
+  duplicateNames: string[];
+  fallbackRole: string;
+  usedColumns: string[];
+}
+
+const COLUMN_KEYS = {
+  name: ['name', 'nombre', 'nom', 'member', 'full name'],
+  role: ['role', 'position', 'service', 'cargo', 'rol', 'title', 'fonction'],
+  group: ['group', 'grupo', 'groupe', 'home group'],
+  district: ['district', 'distrito'],
+  email: ['email', 'e mail', 'correo', 'courriel'],
+  channel: ['channel', 'attending', 'mode', 'location', 'virtual', 'in person', 'asistencia'],
+  present: ['present', 'checked in', 'check in', 'here', 'attendance', 'presente'],
+} as const;
+
+/**
+ * Parse a voter roll from CSV rows (a header row is required). Column names are matched
+ * loosely, and service titles are matched through ROLE_ALIASES, so a registrar's export
+ * usually imports without editing. Anything not understood is reported, not silently guessed.
+ */
+export function rollFromRows(rows: Record<string, string>[], roles: VoterRole[], makeId: () => string): RollImport {
+  const usedColumns = new Set<string>();
+  const pick = (r: Record<string, string>, keys: readonly string[]) => {
     for (const k of Object.keys(r)) {
       const nk = normName(k);
-      if (keys.some((x) => nk === x || nk.includes(x))) return (r[k] ?? '').trim();
+      if (keys.some((x) => nk === x)) {
+        usedColumns.add(k);
+        return (r[k] ?? '').trim();
+      }
+    }
+    for (const k of Object.keys(r)) {
+      const nk = normName(k);
+      if (keys.some((x) => nk.includes(x))) {
+        usedColumns.add(k);
+        return (r[k] ?? '').trim();
+      }
     }
     return '';
   };
+
   const byName = new Map(roles.map((r) => [normName(r.name), r]));
+  const byId = new Map(roles.map((r) => [r.id, r]));
   const fallback = roles.find((r) => r.votes && !r.alternateFor) ?? roles[0];
   const out: Voter[] = [];
+  const unmatched = new Set<string>();
+  const seen = new Set<string>();
+  const dups = new Set<string>();
+  let skipped = 0;
+
   for (const r of rows) {
-    const name = pick(r, 'name', 'nombre', 'nom');
-    if (!name) continue;
-    const roleText = normName(pick(r, 'role', 'position', 'service', 'cargo', 'rol'));
+    const name = pick(r, COLUMN_KEYS.name);
+    if (!name) {
+      skipped++;
+      continue;
+    }
+    const rawRole = pick(r, COLUMN_KEYS.role);
+    const roleText = normName(rawRole);
     let role = byName.get(roleText);
-    if (!role && roleText) role = roles.find((x) => normName(x.name).includes(roleText) || roleText.includes(normName(x.name)));
-    const ch = normName(pick(r, 'channel', 'attend', 'mode', 'virtual'));
-    const channel: Channel = /virt|zoom|online|remote|en linea|en ligne/.test(ch) ? 'virtual' : 'inPerson';
-    const presentText = normName(pick(r, 'present', 'checked', 'attend'));
+    if (!role && roleText) {
+      // exact-ish name match, then the alias table, then a loose contains match
+      role = roles.find((x) => normName(x.name).startsWith(roleText) || roleText.startsWith(normName(x.name)));
+      if (!role) {
+        const alias = ROLE_ALIASES.find((a) => a.match.test(roleText));
+        if (alias) role = byId.get(alias.role);
+      }
+      if (!role) role = roles.find((x) => normName(x.name).includes(roleText) || roleText.includes(normName(x.name)));
+      if (!role) unmatched.add(rawRole);
+    }
+    const key = normName(name);
+    if (seen.has(key)) dups.add(name);
+    seen.add(key);
+
+    const ch = normName(pick(r, COLUMN_KEYS.channel));
+    const presentText = normName(pick(r, COLUMN_KEYS.present));
     out.push({
       id: makeId(),
       name,
       roleId: (role ?? fallback).id,
-      group: pick(r, 'group', 'grupo', 'groupe'),
-      district: pick(r, 'district', 'distrito'),
-      email: pick(r, 'email', 'e mail', 'correo', 'courriel') || undefined,
-      channel,
-      present: /^(y|yes|x|1|true|present|si|oui)$/.test(presentText),
+      group: pick(r, COLUMN_KEYS.group),
+      district: pick(r, COLUMN_KEYS.district),
+      email: pick(r, COLUMN_KEYS.email) || undefined,
+      channel: /virt|zoom|online|remote|en linea|en ligne|hybrid/.test(ch) ? 'virtual' : 'inPerson',
+      present: /^(y|yes|x|1|true|present|si|sí|oui|here)$/.test(presentText),
     });
   }
-  return out;
+  return {
+    voters: out,
+    unmatchedRoles: [...unmatched],
+    skipped,
+    duplicateNames: [...dups],
+    fallbackRole: fallback?.name ?? '',
+    usedColumns: [...usedColumns],
+  };
 }
 

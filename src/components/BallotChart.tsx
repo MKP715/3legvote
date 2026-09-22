@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Chart as ChartJS, BarElement, CategoryScale, Legend, LinearScale, Tooltip, type ChartOptions } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { Bar } from 'react-chartjs-2';
-import { AGAINST, type BallotResult, type Position } from '../engine/types';
+import { AGAINST, type BallotResult, type Language, type Position } from '../engine/types';
 import { nameOf } from '../announce';
-import { fmtLimit, ordinal } from '../engine/thirdLegacy';
+import { fmtLimit } from '../engine/thirdLegacy';
+import { ordinalL, t } from '../i18n';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend, annotationPlugin);
 
@@ -23,19 +24,36 @@ function useThemeColors() {
   };
   const [c, setC] = useState(read);
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const on = () => setC(read());
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
     mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+    // The app's own light/dark switch sets data-theme on <html>.
+    const observer = new MutationObserver(on);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+    return () => {
+      mq.removeEventListener('change', on);
+      observer.disconnect();
+    };
   }, []);
   return c;
 }
 
 /** Stacked in-person + virtual bars for one ballot, with the two-thirds line. */
-export function BallotChart({ position, result, large = false }: { position: Position; result: BallotResult; large?: boolean }) {
+export function BallotChart({
+  position,
+  result,
+  large = false,
+  lang = 'en',
+}: {
+  position: Position;
+  result: BallotResult;
+  large?: boolean;
+  lang?: Language;
+}) {
   const colors = useThemeColors();
+  const d = t(lang);
   const ids = result.isConfirmation ? [...result.activeIds, AGAINST] : result.ranking;
-  const labels = ids.map((id) => (result.isConfirmation && id !== AGAINST ? `Yes — ${nameOf(position, id)}` : nameOf(position, id)));
+  const labels = ids.map((id) => (result.isConfirmation && id !== AGAINST ? d.yesFor(nameOf(position, id, lang)) : nameOf(position, id, lang)));
   const fontSize = large ? 22 : 13;
 
   const annotations: Record<string, object> = {
@@ -90,7 +108,7 @@ export function BallotChart({ position, result, large = false }: { position: Pos
           footer: (items) => {
             const id = ids[items[0].dataIndex];
             const v = result.votes[id];
-            return `Total ${v.total} of ${result.totalVote}`;
+            return `${v.total} / ${result.totalVote}`;
           },
         },
       },
@@ -101,14 +119,14 @@ export function BallotChart({ position, result, large = false }: { position: Pos
   const data = {
     labels,
     datasets: [
-      { label: 'In-person', data: ids.map((id) => result.votes[id].inPerson), backgroundColor: IN_PERSON, borderRadius: 3 },
-      { label: 'Virtual', data: ids.map((id) => result.votes[id].virtual), backgroundColor: VIRTUAL, borderRadius: 3 },
+      { label: d.inPerson, data: ids.map((id) => result.votes[id].inPerson), backgroundColor: IN_PERSON, borderRadius: 3 },
+      { label: d.virtual, data: ids.map((id) => result.votes[id].virtual), backgroundColor: VIRTUAL, borderRadius: 3 },
     ],
   };
 
   const height = Math.max(160, ids.length * (large ? 72 : 44) + 70);
   return (
-    <figure className="chart" style={{ height }} aria-label={`${ordinal(result.number)} ballot results chart`}>
+    <figure className="chart" style={{ height }} aria-label={`${ordinalL(result.number, lang)} — ${d.totalVoteLabel} ${result.totalVote}`}>
       <Bar data={data} options={options} />
     </figure>
   );

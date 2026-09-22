@@ -10,8 +10,10 @@ import { Guide } from './pages/Guide';
 import { VotersPage } from './pages/VotersPage';
 import { TellerPage } from './pages/TellerPage';
 import { NotFound } from './pages/NotFound';
-import { ConfirmHost, ToastHost } from './components/ui';
+import { ConfirmHost, ErrorBoundary, notify, ToastHost } from './components/ui';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { TabWarning } from './components/TabWarning';
+import { setStorageErrorHandler } from './store';
 
 type Theme = 'auto' | 'light' | 'dark';
 
@@ -68,6 +70,19 @@ function Prefs() {
   );
 }
 
+/** Screens shown to the room must not display operator chrome (toasts, dialogs, update banner). */
+function OperatorChrome() {
+  const loc = useLocation();
+  if (loc.pathname.startsWith('/display/')) return null;
+  return (
+    <>
+      <ToastHost />
+      <ConfirmHost />
+      <UpdatePrompt />
+    </>
+  );
+}
+
 function Shell() {
   const loc = useLocation();
   if (loc.pathname.startsWith('/display/')) {
@@ -110,6 +125,7 @@ function Shell() {
         </nav>
       </header>
       <main className="container" id="main">
+        <TabWarning />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/guide" element={<Guide />} />
@@ -126,7 +142,8 @@ function Shell() {
           Works offline · data stays in this browser · not affiliated with Alcoholics Anonymous World Services, Inc. ·{' '}
           <a href="https://github.com/MKP715/3legvote" target="_blank" rel="noreferrer">
             Source (GPL-3.0)
-          </a>
+          </a>{' '}
+          · version {__APP_VERSION__}
         </small>
       </footer>
     </>
@@ -134,12 +151,17 @@ function Shell() {
 }
 
 export function App() {
+  useEffect(() => {
+    // A failed save must be visible — the chair may need to export a backup immediately.
+    setStorageErrorHandler((message) => notify(message, 'error'));
+    return () => setStorageErrorHandler(null);
+  }, []);
   return (
     <HashRouter>
-      <Shell />
-      <ToastHost />
-      <ConfirmHost />
-      <UpdatePrompt />
+      <ErrorBoundary>
+        <Shell />
+      </ErrorBoundary>
+      <OperatorChrome />
     </HashRouter>
   );
 }

@@ -8,10 +8,10 @@ import { confirmAction, notify } from '../components/ui';
 import { OpeningScript } from '../components/OpeningScript';
 import { LiveControls } from '../components/LiveControls';
 import { exportCsv, exportJson, resultsSummaryText } from '../exporters';
-import { PRESETS, ballotColor } from '../presets';
+import { DEFAULT_BALLOT_COLORS, PRESETS, ballotColor } from '../presets';
 import { LANGUAGES } from '../i18n';
 import { NotFound } from './NotFound';
-import { openDisplay } from './Display';
+import { displayUrl, openDisplay } from './Display';
 
 export function AssemblyPage() {
   const { aid } = useParams();
@@ -48,7 +48,24 @@ export function AssemblyPage() {
       <div className="row-between wrap">
         <h2 style={{ margin: 0 }}>{a.name}</h2>
         <div className="row wrap">
-          <button className="outline" onClick={() => openDisplay(a.id)}>
+          <button
+            className="outline"
+            onClick={async () => {
+              if (!openDisplay(a.id)) {
+                await confirmAction({
+                  title: 'The projector window was blocked',
+                  body: (
+                    <p>
+                      Allow pop-ups for this site, or open this address in a second window:
+                      <br />
+                      <code>{displayUrl(a.id)}</code>
+                    </p>
+                  ),
+                  confirmLabel: 'OK',
+                });
+              }
+            }}
+          >
             📽 Projector display
           </button>
           <Link role="button" className="outline" to={`/a/${a.id}/report`}>
@@ -212,16 +229,17 @@ export function AssemblyPage() {
             <label>
               Ballot colours, in order
               <input
+                key={a.ballotColors.join(',')}
                 type="text"
                 defaultValue={a.ballotColors.join(', ')}
-                onBlur={(e) =>
-                  s.updateAssembly(a.id, {
-                    ballotColors: e.target.value
-                      .split(',')
-                      .map((x) => x.trim())
-                      .filter(Boolean),
-                  })
-                }
+                onBlur={(e) => {
+                  const colors = e.target.value
+                    .split(',')
+                    .map((x) => x.trim())
+                    .filter(Boolean);
+                  // An empty list would leave every round without a colour — keep the defaults.
+                  s.updateAssembly(a.id, { ballotColors: colors.length ? colors : [...DEFAULT_BALLOT_COLORS] });
+                }}
               />
             </label>
           </div>
@@ -253,7 +271,26 @@ export function AssemblyPage() {
             <div className="warn-box">
               <strong>Locked — ballots have been recorded.</strong> The rules must be settled before an election is conducted. Changing them now would
               recalculate every position.{' '}
-              <button className="outline mini" onClick={() => setUnlocked(true)}>
+              <button
+                className="outline mini"
+                onClick={async () => {
+                  const decided = a.positions.filter((p) => computePosition(p, a.settings).phase.kind === 'elected').length;
+                  if (
+                    await confirmAction({
+                      title: 'Unlock the procedure settings?',
+                      body: (
+                        <p>
+                          Every position is recalculated from its recorded ballots. {decided > 0 && `${decided} position(s) already show a result and could change.`}{' '}
+                          The Service Manual asks that rule changes be made before an election is conducted — use this only to correct a mistake.
+                        </p>
+                      ),
+                      confirmLabel: 'Unlock',
+                      danger: true,
+                    })
+                  )
+                    setUnlocked(true);
+                }}
+              >
                 Unlock to correct a mistake
               </button>
             </div>

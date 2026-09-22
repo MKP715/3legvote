@@ -47,10 +47,12 @@ export function LiveControls({ assembly }: { assembly: Assembly }) {
   const [minutes, setMinutes] = useState<number | null>(3);
   const [label, setLabel] = useState('Candidate sharing');
   const [msg, setMsg] = useState(assembly.live.message);
+  // The message can also be changed from another window.
+  useEffect(() => setMsg(assembly.live.message), [assembly.live.message]);
   useTick(!!timer && timer.endsAt !== null);
 
   const start = () => {
-    const sec = Math.max(5, (minutes ?? 3) * 60);
+    const sec = Math.max(30, (minutes && minutes > 0 ? minutes : 3) * 60);
     s.setTimer(assembly.id, { label, durationSec: sec, endsAt: Date.now() + sec * 1000, remainingSec: sec });
   };
   const pause = () => timer && s.setTimer(assembly.id, { ...timer, endsAt: null, remainingSec: remainingSeconds(timer) });

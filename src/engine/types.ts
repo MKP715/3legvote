@@ -69,6 +69,8 @@ export interface ChannelCounts {
 export interface BallotRecord {
   id: string;
   counts: Record<Channel, ChannelCounts>;
+  /** Teller/poll reports that made up these counts (kept so an undo can restore them). */
+  tellerReports?: TellerReport[];
   /** Eligible voters present per channel when the ballot was recorded (0 = not tracked). */
   eligibleVoters: Record<Channel, number>;
   /** Ballot papers / poll responses the tellers physically collected, if tracked. */
@@ -131,6 +133,8 @@ export interface Appointment {
   candidateId: string;
   fromPositionId: string;
   fromPositionTitle: string;
+  /** True when the draw created this candidate row (so undoing the draw may remove it again). */
+  createdCandidate?: boolean;
 }
 
 export interface Position {

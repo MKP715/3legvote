@@ -113,7 +113,7 @@ export function Report() {
               <h4>
                 {ordinal(r.number)} ballot <span className="sub muted">{fmt(p.ballots[r.number - 1].recordedAt)}</span>
               </h4>
-              {ballotAnnouncement(p, r).map((l, i) => (
+              {ballotAnnouncement(p, r, a.language).map((l, i) => (
                 <p key={i}>{l}</p>
               ))}
               <p className="sub muted">

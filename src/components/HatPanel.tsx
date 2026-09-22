@@ -3,7 +3,7 @@ import type { Assembly, Position } from '../engine/types';
 import { secureShuffle } from '../engine/random';
 import { useStore } from '../store';
 import { listNames, nameOf } from '../announce';
-import { attempt, confirmAction } from './ui';
+import { attempt, confirmAction, notify } from './ui';
 
 /**
  * Going to the hat. Either the app draws (cryptographically secure and unbiased), or the
@@ -15,7 +15,16 @@ export function HatPanel({ assembly, position, poolIds, reason }: { assembly: As
   const [flash, setFlash] = useState<string | null>(null);
   const [physicalOrder, setPhysicalOrder] = useState<string[]>([]);
   const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearInterval(timer.current), []);
+  const timeouts = useRef<number[]>([]);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      window.clearInterval(timer.current);
+      timeouts.current.forEach((t) => window.clearTimeout(t));
+    };
+  }, []);
 
   const secondTarget = position.hatSecondToPositionId ? assembly.positions.find((p) => p.id === position.hatSecondToPositionId) : undefined;
 
@@ -39,19 +48,31 @@ export function HatPanel({ assembly, position, poolIds, reason }: { assembly: As
     timer.current = window.setInterval(() => {
       setFlash(nameOf(position, poolIds[i++ % poolIds.length]));
     }, 110);
-    window.setTimeout(() => {
-      window.clearInterval(timer.current);
-      setFlash(nameOf(position, order[0]));
+    timeouts.current.push(
       window.setTimeout(() => {
-        setSpinning(false);
-        setFlash(null);
-        attempt(() => recordHat(assembly.id, position.id, { mode: 'digital', poolIds, order }));
-      }, 900);
-    }, 2400);
+        window.clearInterval(timer.current);
+        if (!alive.current) return;
+        setFlash(nameOf(position, order[0]));
+        timeouts.current.push(
+          window.setTimeout(() => {
+            if (!alive.current) return;
+            setSpinning(false);
+            setFlash(null);
+            const ok = attempt(() => recordHat(assembly.id, position.id, { mode: 'digital', poolIds, order }));
+            // If the position moved on meanwhile, don't leave the projector spinning.
+            if (!ok) useStore.getState().setLiveStatus(assembly.id, 'idle');
+          }, 900),
+        );
+      }, 2400),
+    );
   };
 
   const recordPhysical = async () => {
     const remaining = poolIds.filter((id) => !physicalOrder.includes(id));
+    if (secondTarget && !secondTarget.started && remaining.length) {
+      notify(`Click the names in the order they came out of the hat — the second name is elected ${secondTarget.title}.`, 'error');
+      return;
+    }
     const order = [...physicalOrder, ...remaining];
     const ok = await confirmAction({
       title: `Record ${nameOf(position, order[0])} as first out of the hat?`,
@@ -70,6 +91,14 @@ export function HatPanel({ assembly, position, poolIds, reason }: { assembly: As
         {reason === 'motionDefeated' ? 'The motion for a fifth ballot was defeated.' : 'No candidate received two-thirds on the fifth ballot.'} The top two
         candidates remain (all tied leaders, or the leader and anyone tied for second). <strong>The first name out of the hat is elected.</strong>
       </p>
+      {assembly.live.status === 'drawing' && !spinning && (
+        <div className="warn-box row-between wrap">
+          <span>The projector is showing “drawing from the hat”.</span>
+          <button className="outline mini" onClick={() => useStore.getState().setLiveStatus(assembly.id, 'idle')}>
+            Stop the animation
+          </button>
+        </div>
+      )}
       <div className="hat-names">
         {poolIds.map((id) => (
           <span key={id} className="hat-name">

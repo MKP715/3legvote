@@ -10,9 +10,9 @@ import { MotionPanel } from '../components/MotionPanel';
 import { HatPanel } from '../components/HatPanel';
 import { CandidateSetup } from '../components/CandidateSetup';
 import { PhaseBadge, VotersBar } from '../components/common';
-import { attempt, Badge, confirmAction } from '../components/ui';
+import { attempt, Badge, confirmAction, notify } from '../components/ui';
 import { NotFound } from './NotFound';
-import { openDisplay } from './Display';
+import { displayUrl, openDisplay } from './Display';
 import { Stepper } from '../components/Stepper';
 import { OpeningScript } from '../components/OpeningScript';
 import { LiveControls } from '../components/LiveControls';
@@ -42,10 +42,23 @@ export function PositionPage() {
 
   const withdraw = async (cid: string) => {
     const name = nameOf(position, cid);
+    const d = position.draft;
+    const countingNow =
+      !!d && (['inPerson', 'virtual'] as const).some((ch) => Object.values(d.counts[ch].votes).some((n) => n > 0) || d.counts[ch].invalid > 0);
     if (
       await confirmAction({
         title: `${name} withdraws voluntarily?`,
-        body: <p>{name} will be removed from the board starting with the next ballot.</p>,
+        body: (
+          <>
+            <p>{name} comes off the board from the next ballot.</p>
+            {countingNow && (
+              <p className="sub muted">
+                The tellers are already counting the {ordinal(position.ballots.length + 1)} ballot, so {name}’s votes on that ballot still count towards
+                the total vote — they come off the board for the ballot after it.
+              </p>
+            )}
+          </>
+        ),
         confirmLabel: 'Withdraw',
         danger: true,
       })
@@ -114,9 +127,21 @@ export function PositionPage() {
           )}
           <button
             className={isLive ? '' : 'outline'}
-            onClick={() => {
+            onClick={async () => {
               s.setLivePosition(assembly.id, position.id);
-              openDisplay(assembly.id);
+              if (!openDisplay(assembly.id)) {
+                await confirmAction({
+                  title: 'The projector window was blocked',
+                  body: (
+                    <p>
+                      Allow pop-ups for this site, or open this address in a second window:
+                      <br />
+                      <code>{displayUrl(assembly.id)}</code>
+                    </p>
+                  ),
+                  confirmLabel: 'OK',
+                });
+              }
             }}
             title="Show this position on the projector / shared-screen display"
           >
@@ -161,8 +186,8 @@ export function PositionPage() {
 
       {state.ignoredBallots > 0 && (
         <div className="warn-box">
-          {state.ignoredBallots} recorded ballot(s) were not used because the election was already decided or the procedure did not allow them. Use
-          “Undo last ballot” to remove them.
+          {state.ignoredBallots} recorded ballot(s) were not used because the election was already decided or the procedure did not allow them. Open
+          <strong> Corrections</strong> below and undo in reverse order — the hat draw first, then the fifth-ballot motion, then the ballots.
         </div>
       )}
 
@@ -188,6 +213,7 @@ export function PositionPage() {
               onClick={() => {
                 const id = s.addSeat(assembly.id, position.id);
                 if (id) nav(`/a/${assembly.id}/p/${id}`);
+                else notify('Could not add another seat for this office.', 'error');
               }}
             >
               Elect another seat for this office
@@ -242,7 +268,11 @@ export function PositionPage() {
             <div className="row wrap">
               <span className="muted">Take back a withdrawal made since the last ballot:</span>
               {withdrawnSinceLast.map((c) => (
-                <button key={c.id} className="outline" onClick={() => attempt(() => s.reinstateCandidate(assembly.id, position.id, c.id))}>
+                <button
+                  key={c.id}
+                  className="outline"
+                  onClick={() => attempt(() => s.reinstateCandidate(assembly.id, position.id, c.id), `${c.name} is back on the board.`)}
+                >
                   Reinstate {c.name}
                 </button>
               ))}

@@ -58,7 +58,15 @@ All the arithmetic uses whole numbers, so there are no rounding mistakes.
 - Printable report (or save as PDF) with the officials, approvals, attendance, every ballot and the audit log.
 - CSV export and a plain-text results summary.
 - JSON backup and restore, for one election or everything at once.
-- Procedure settings lock once voting starts. Every correction is logged: reopening a ballot for a recount, undoing a motion or draw, or resetting a position.
+- Procedure settings lock once voting starts (unlocking asks first and says how many results could change). Every correction is logged: reopening a ballot for a recount, undoing a motion or draw, or resetting a position.
+
+**Guards against a wrong result**
+- A candidate who withdraws while a ballot is being counted stays on *that* ballot, so the total vote — and the two-thirds threshold — cannot shrink underneath the votes already cast.
+- Where the second name out of the hat fills another position, every slip must be drawn and recorded in order; undoing a draw never deletes a nominee the other position already had.
+- A ballot cannot be undone while the next one is being counted, and clearing counts keeps teller links working.
+- Teller reports are checked against the ballot they were counted for; a duplicate is refused and an updated one replaces the old.
+- One bad record can never wipe the rest of your saved elections, a failed save is reported, and a screen error offers a reload instead of a blank page.
+- The app warns if the same election is open in a second window, where the last save would win.
 
 **App**
 - Installable and works offline (PWA).
@@ -84,9 +92,11 @@ The Service Manual leaves some details open. You can set these per election, and
 ```bash
 npm install
 npm run dev        # dev server (src/ is the Vite root)
-npm test           # Vitest: rules engine, eligibility, poll import, teller codes, store
+npm test           # Vitest: 85 tests — rules engine, eligibility, poll import, teller codes, store
 npm run build      # type-check + build + publish the site to the repository root
 ```
+
+Builds are reproducible (the version shown in the footer comes from `package.json`), so CI can check that the site committed at the repository root matches `src/`. Bump the version when you publish a change.
 
 GitHub Pages is set to **Deploy from a branch: `main` / (root)**. So `npm run build` compiles to `dist/`, and then `scripts/publish.mjs` copies the finished site (`index.html`, `assets/`, the service worker, the manifest and icons) to the repository root, next to a `.nojekyll` file. **After changing anything in `src/`, run `npm run build` and commit the regenerated files.** The CI workflow checks that the tests pass and the build succeeds.
 
