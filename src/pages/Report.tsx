@@ -72,7 +72,8 @@ export function Report() {
 
       <ReportMeta a={a} fmt={fmt} />
 
-      <h2>Summary</h2>
+      <section className="report-section">
+      <h2>Summary of the elections</h2>
       <table>
         <thead>
           <tr>
@@ -101,10 +102,14 @@ export function Report() {
           ))}
         </tbody>
       </table>
+      </section>
 
       {states.map(({ p, st }) => (
-        <section key={p.id} className="report-position">
-          <h2>{p.title}</h2>
+        <section key={p.id} className="report-position report-section">
+          <h2>
+            {p.title}
+            {st.phase.kind === 'elected' && <span className="report-elected-inline"> — {nameOf(p, st.phase.candidateId, a.language)}</span>}
+          </h2>
           {p.description && <p className="muted">{p.description}</p>}
           <p>Candidates: {p.candidates.map((c) => c.name).join(', ') || '—'}</p>
           {st.ballots.length > 0 && <Board position={p} state={st} breakdown />}
@@ -148,8 +153,11 @@ export function Report() {
         </section>
       ))}
 
-      <section className="report-log">
+      <Attendance a={a} />
+
+      <section className="report-section report-log">
         <h2>Audit log</h2>
+        <p className="sub">Every action recorded by the app, in order, including any correction.</p>
         <table>
           <tbody>
             {a.log.map((l, i) => (
@@ -162,14 +170,19 @@ export function Report() {
           </tbody>
         </table>
       </section>
+
+      <Signatures a={a} />
+
+      <p className="sub muted report-foot">
+        Produced by Third Legacy Vote {__APP_VERSION__} on {new Date().toLocaleString()} from the records kept during the assembly. The procedure
+        follows The A.A. Service Manual, Appendix G.
+      </p>
     </div>
   );
 }
 
 function ReportMeta({ a, fmt }: { a: import('../engine/types').Assembly; fmt: (iso: string) => string }) {
   const o = a.officials;
-  const el = computeEligibility(a.voterRoll, a.roles);
-  const roleName = new Map(a.roles.map((r) => [r.id, r.name]));
   const officials = [
     ['Secretary', o.secretary],
     ['Registrar', o.registrar],
@@ -202,37 +215,71 @@ function ReportMeta({ a, fmt }: { a: import('../engine/types').Assembly; fmt: (i
           </span>
         ))}
       </p>
-      {a.voterRoll.length > 0 && (
-        <details className="report-attendance" open>
-          <summary>
-            Attendance — {el.present} present, {el.total} voting ({el.byChannel.inPerson} in person, {el.byChannel.virtual} virtual)
-          </summary>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Group / district</th>
-                <th>Attending</th>
-                <th>Voting</th>
-              </tr>
-            </thead>
-            <tbody>
-              {a.voterRoll
-                .filter((v) => v.present)
-                .map((v) => (
-                  <tr key={v.id}>
-                    <td>{v.name}</td>
-                    <td>{roleName.get(v.roleId)}</td>
-                    <td>{[v.group, v.district].filter(Boolean).join(' · ')}</td>
-                    <td>{CHANNEL_LABEL[v.channel]}</td>
-                    <td>{el.eligible.some((x) => x.id === v.id) ? 'yes' : 'no'}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </details>
-      )}
     </>
+  );
+}
+
+/** Who was in the room (and online), and who had a vote. */
+function Attendance({ a }: { a: import('../engine/types').Assembly }) {
+  const el = computeEligibility(a.voterRoll, a.roles);
+  const roleName = new Map(a.roles.map((r) => [r.id, r.name]));
+  const present = a.voterRoll.filter((v) => v.present);
+  if (!present.length) return null;
+  return (
+    <section className="report-section">
+      <h2>Attendance</h2>
+      <p className="sub">
+        {el.present} present — {el.total} voting ({el.byChannel.inPerson} in person, {el.byChannel.virtual} virtual). Alternates vote only when the
+        member they stand in for is absent; nobody votes twice.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Group / district</th>
+            <th>Attending</th>
+            <th>Voting</th>
+          </tr>
+        </thead>
+        <tbody>
+          {present.map((v) => (
+            <tr key={v.id}>
+              <td>{v.name}</td>
+              <td>{roleName.get(v.roleId)}</td>
+              <td>{[v.group, v.district].filter(Boolean).join(' · ')}</td>
+              <td>{CHANNEL_LABEL[v.channel]}</td>
+              <td>{el.eligible.some((x) => x.id === v.id) ? 'yes' : 'no'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+/** Space for the signatures that make this the assembly's record. */
+function Signatures({ a }: { a: import('../engine/types').Assembly }) {
+  const lines = [
+    ['Chair', a.chair],
+    ['Secretary', a.officials.secretary],
+    ['Teller', a.officials.tellers.split(/[,;]/)[0]?.trim() ?? ''],
+    ['Teller', a.officials.tellers.split(/[,;]/)[1]?.trim() ?? ''],
+  ];
+  return (
+    <section className="report-section signatures">
+      <h2>Certified by</h2>
+      <div className="sign-grid">
+        {lines.map(([role, who], i) => (
+          <div key={i} className="sign-line">
+            <div className="sign-rule" />
+            <div className="sub">
+              {role}
+              {who ? ` — ${who}` : ''}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

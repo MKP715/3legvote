@@ -249,6 +249,11 @@ export function Guide() {
           no proxies or absentee ballots. An alternate votes only when their GSR (or DCM) is absent.
         </li>
         <li>
+          <strong>Voting cards and the check-in desk.</strong> Print a card for each member (eight to a page) and scan them at the door with a laptop or
+          tablet camera — the desk shows each person's name, role and whether they have a vote. A lost card is no problem: the desk can also find the
+          name.
+        </li>
+        <li>
           <strong>In the room</strong>, voters write one name on the paper ballot. Tellers count — by hand, by tapping in the app, or on their own
           phones using the teller QR code.
         </li>
@@ -301,6 +306,11 @@ export function Guide() {
         This app runs entirely in your browser and keeps working offline once loaded. Elections are saved on this device only — nothing is uploaded.
         Teller devices exchange counts through QR/text codes, not a server. Use <strong>Back up everything</strong> or <strong>Export (.json)</strong> to
         keep a copy or move to another computer, and <strong>Report</strong> to print or save a PDF.
+      </p>
+      <p>
+        Best of all, set up <strong>automatic backup</strong> on the assembly page: choose a folder once — a USB stick, or a folder that syncs — and the
+        app writes the whole election there after every ballot, with a time-stamped snapshot of each step. If the laptop closes or the browser is
+        cleared, open the file and carry on.
       </p>
 
       <p className="muted small">

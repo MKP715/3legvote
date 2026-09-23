@@ -4,9 +4,10 @@ import { effectiveVoters, useAssembly } from '../store';
 import { computePosition, ordinal } from '../engine/thirdLegacy';
 import { ballotColor } from '../presets';
 import { NumberField } from '../components/ui';
+import { VotingCards } from '../components/VotingCards';
 import { NotFound } from './NotFound';
 
-type Kind = 'slips' | 'tally' | 'board';
+type Kind = 'slips' | 'tally' | 'board' | 'cards';
 
 /**
  * Printables: paper ballot slips (8 per page), teller tally sheets, and a large
@@ -21,6 +22,7 @@ export function PrintBallots() {
   const [ballotNo, setBallotNo] = useState<number | null>(null);
   const [showNames, setShowNames] = useState(false);
   const [copies, setCopies] = useState<number | null>(2);
+  const [cardFilter, setCardFilter] = useState<'all' | 'present' | 'absent'>('all');
   if (!a) return <NotFound what="assembly" />;
   const position = a.positions.find((p) => p.id === pid);
   const state = position ? computePosition(position, a.settings) : null;
@@ -44,7 +46,7 @@ export function PrintBallots() {
       </nav>
       <article className="no-print">
         <header>
-          <div role="group" aria-label="What to print">
+          <div role="group" className="print-kinds" aria-label="What to print">
             <button className={kind === 'slips' ? '' : 'outline secondary'} aria-pressed={kind === 'slips'} onClick={() => setKind('slips')}>
               Ballot slips
             </button>
@@ -54,9 +56,13 @@ export function PrintBallots() {
             <button className={kind === 'board' ? '' : 'outline secondary'} aria-pressed={kind === 'board'} onClick={() => setKind('board')}>
               Candidate board
             </button>
+            <button className={kind === 'cards' ? '' : 'outline secondary'} aria-pressed={kind === 'cards'} onClick={() => setKind('cards')}>
+              Voting cards
+            </button>
           </div>
         </header>
         <div className="grid">
+          {kind !== 'cards' && (
           <label>
             Position
             <select value={pid} onChange={(e) => setPid(e.target.value)}>
@@ -68,7 +74,8 @@ export function PrintBallots() {
               ))}
             </select>
           </label>
-          {kind !== 'board' && (
+          )}
+          {kind !== 'board' && kind !== 'cards' && (
             <label>
               Ballot number
               <NumberField value={ballotNo} allowNull onChange={setBallotNo} placeholder="blank" />
@@ -93,6 +100,23 @@ export function PrintBallots() {
             </p>
           </>
         )}
+        {kind === 'cards' && (
+          <>
+            <label>
+              Who to print a card for
+              <select value={cardFilter} onChange={(e) => setCardFilter(e.target.value as typeof cardFilter)}>
+                <option value="all">Everyone on the roll ({a.voterRoll.length})</option>
+                <option value="absent">Only those not yet checked in ({a.voterRoll.filter((v) => !v.present).length})</option>
+                <option value="present">Only those checked in ({a.voterRoll.filter((v) => v.present).length})</option>
+              </select>
+            </label>
+            <p className="muted">
+              Eight cards per page, with a QR code the <Link to={`/a/${a.id}/checkin`}>check-in desk</Link> scans. The code identifies the member within
+              this election only — no name or email is in it. Print on card stock, or on paper for a lanyard holder.
+              {a.voterRoll.length === 0 && ' Add people to the roll call first.'}
+            </p>
+          </>
+        )}
         {kind === 'tally' && (
           <>
             <label>
@@ -105,7 +129,7 @@ export function PrintBallots() {
           </>
         )}
         {kind === 'board' && <p className="muted">Large list of the candidates for posting on the wall; fill in each ballot’s tally by hand if you are not projecting.</p>}
-        <button onClick={() => window.print()} disabled={kind !== 'slips' && !position}>
+        <button onClick={() => window.print()} disabled={(kind === 'tally' || kind === 'board') && !position}>
           Print
         </button>
       </article>
@@ -172,6 +196,13 @@ export function PrintBallots() {
             </section>
           ))}
         </div>
+      )}
+
+      {kind === 'cards' && (
+        <VotingCards
+          assembly={a}
+          voters={a.voterRoll.filter((v) => (cardFilter === 'all' ? true : cardFilter === 'present' ? v.present : !v.present))}
+        />
       )}
 
       {kind === 'board' && position && (

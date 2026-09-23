@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeEligibility, regionalTrusteeBalance, rollFromRows } from './voters';
 import { parsePoll } from './pollImport';
-import { decodeResult, decodeSetup, encodeResult, encodeSetup } from './tellerCodes';
+import { decodeCheckin, decodeResult, decodeSetup, encodeCheckin, encodeResult, encodeSetup } from './tellerCodes';
 import { AGAINST, type Voter } from './types';
 import { PRESETS } from '../presets';
 import { ballotAnnouncement, nextStepAnnouncement, openingScript } from '../announce';
@@ -299,6 +299,15 @@ describe('teller codes', () => {
     const code = encodeResult(res);
     expect(decodeResult(code)).toEqual(res);
     expect(decodeResult(`  ${code}\n`)).toEqual(res); // tolerant of whitespace when pasted
+  });
+
+  it('round-trips a voting card code and rejects anything else', () => {
+    const code = encodeCheckin({ v: 1, a: 'assembly1', i: 'voter7' });
+    expect(decodeCheckin(code)).toEqual({ v: 1, a: 'assembly1', i: 'voter7' });
+    // A card carries no personal details — just the two ids.
+    expect(JSON.stringify(decodeCheckin(code))).not.toMatch(/name|email/i);
+    expect(() => decodeCheckin('TLC1.bogus.0000')).toThrow();
+    expect(() => decodeCheckin(encodeResult({ v: 1, k: 'k', r: 'r', t: 't', ch: 'inPerson', c: [1], i: 0 }))).toThrow(/not a voting card/);
   });
 
   it('rejects damaged or foreign codes', () => {

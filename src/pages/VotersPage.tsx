@@ -137,6 +137,9 @@ export function VotersPage() {
       </nav>
       <div className="row-between wrap">
         <h2 style={{ margin: 0 }}>Registration &amp; roll call</h2>
+        <Link role="button" className="outline" to={`/a/${a.id}/checkin`}>
+          📷 Check-in desk
+        </Link>
         <label className="inline-field">
           <input type="checkbox" role="switch" checked={a.useRollForCounts} onChange={(e) => s.updateAssembly(a.id, { useRollForCounts: e.target.checked })} />
           Use this roll for eligible voter counts
@@ -183,6 +186,9 @@ export function VotersPage() {
             <button className="outline secondary" onClick={exportRoll} disabled={!a.voterRoll.length}>
               Export attendance
             </button>
+            <Link role="button" className="outline secondary" to={`/a/${a.id}/ballots`}>
+              Print voting cards
+            </Link>
             <button
               className="outline danger"
               disabled={!el.present}

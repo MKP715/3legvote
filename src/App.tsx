@@ -8,11 +8,13 @@ import { Display } from './pages/Display';
 import { PrintBallots } from './pages/PrintBallots';
 import { Guide } from './pages/Guide';
 import { VotersPage } from './pages/VotersPage';
+import { CheckinPage } from './pages/CheckinPage';
 import { TellerPage } from './pages/TellerPage';
 import { NotFound } from './pages/NotFound';
 import { ConfirmHost, ErrorBoundary, notify, ToastHost } from './components/ui';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { TabWarning } from './components/TabWarning';
+import { AutoBackup } from './components/BackupPanel';
 import { setStorageErrorHandler } from './store';
 
 type Theme = 'auto' | 'light' | 'dark';
@@ -132,6 +134,7 @@ function Shell() {
           <Route path="/a/:aid" element={<AssemblyPage />} />
           <Route path="/a/:aid/p/:pid" element={<PositionPage />} />
           <Route path="/a/:aid/voters" element={<VotersPage />} />
+          <Route path="/a/:aid/checkin" element={<CheckinPage />} />
           <Route path="/a/:aid/report" element={<Report />} />
           <Route path="/a/:aid/ballots" element={<PrintBallots />} />
           <Route path="*" element={<NotFound />} />
@@ -171,6 +174,7 @@ export function App() {
       <ErrorBoundary>
         <Shell />
       </ErrorBoundary>
+      <AutoBackup />
       <OperatorChrome />
     </HashRouter>
   );

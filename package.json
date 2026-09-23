@@ -1,7 +1,7 @@
 {
   "name": "3legvote",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Third Legacy Procedure election manager for A.A. service assemblies (hybrid in-person + virtual).",
   "license": "GPL-3.0-only",
   "type": "module",
@@ -19,6 +19,7 @@
     "chart.js": "^4.5.1",
     "chartjs-plugin-annotation": "^3.1.0",
     "file-saver": "^2.0.5",
+    "idb-keyval": "^6.3.0",
     "immer": "^11.1.18",
     "jsqr": "^1.4.0",
     "nanoid": "^6.0.1",

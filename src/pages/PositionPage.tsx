@@ -16,6 +16,7 @@ import { displayUrl, openDisplay } from './Display';
 import { Stepper } from '../components/Stepper';
 import { OpeningScript } from '../components/OpeningScript';
 import { LiveControls } from '../components/LiveControls';
+import { BackupChip } from '../components/BackupPanel';
 import { LANGUAGES } from '../i18n';
 
 export function PositionPage() {
@@ -115,6 +116,7 @@ export function PositionPage() {
           {position.title} <PhaseBadge phase={phase} position={position} />
         </h2>
         <div className="row wrap">
+          <BackupChip assembly={assembly} />
           {prev && (
             <Link role="button" className="outline secondary" to={`/a/${assembly.id}/p/${prev.id}`}>
               ← {prev.title}

@@ -91,6 +91,16 @@ type Dict = {
   inPerson: string;
   virtual: string;
   opening: (title: string, whoVotes: string, colors: string) => string[];
+  // extra projector labels
+  positionOf: (n: number, total: number) => string;
+  turnoutLabel: string;
+  eligibleLabel: string;
+  electedSoFar: string;
+  comingUp: string;
+  needToElect: (need: number, total: number) => string;
+  withdrawHint: (frac: string, limit: string) => string;
+  notYetHeld: string;
+  locale: string;
 };
 
 const EN: Dict = {
@@ -176,6 +186,15 @@ const EN: Dict = {
   noCandidates: 'All candidates have withdrawn',
   inPerson: 'in person',
   virtual: 'virtual',
+  positionOf: (n, total) => `Position ${n} of ${total}`,
+  turnoutLabel: 'Turnout',
+  eligibleLabel: 'Eligible voters',
+  electedSoFar: 'Elected so far',
+  comingUp: 'Still to elect',
+  needToElect: (need, total) => `${need} of ${total} votes elects`,
+  withdrawHint: (frac, limit) => `Under ${limit} (${frac}) is withdrawn after this ballot`,
+  notYetHeld: 'not yet held',
+  locale: 'en',
   opening: (title, whoVotes, colors) => [
     `We will now elect our ${title} using the Third Legacy Procedure, as described in The A.A. Service Manual.`,
     `Who votes: ${whoVotes}`,
@@ -271,6 +290,15 @@ const ES: Dict = {
   noCandidates: 'Todos los candidatos se han retirado',
   inPerson: 'en persona',
   virtual: 'virtuales',
+  positionOf: (n, total) => `Cargo ${n} de ${total}`,
+  turnoutLabel: 'Participación',
+  eligibleLabel: 'Votantes elegibles',
+  electedSoFar: 'Elegidos hasta ahora',
+  comingUp: 'Faltan por elegir',
+  needToElect: (need, total) => `${need} de ${total} votos eligen`,
+  withdrawHint: (frac, limit) => `Menos de ${limit} (${frac}) se retira después de esta votación`,
+  notYetHeld: 'aún no se ha votado',
+  locale: 'es',
   opening: (title, whoVotes, colors) => [
     `Vamos a elegir ${title} mediante el Procedimiento del Tercer Legado, descrito en El Manual de Servicio de A.A.`,
     `Quién vota: ${whoVotes}`,
@@ -366,6 +394,15 @@ const FR: Dict = {
   noCandidates: 'Tous les candidats se sont retirés',
   inPerson: 'en personne',
   virtual: 'en ligne',
+  positionOf: (n, total) => `Poste ${n} sur ${total}`,
+  turnoutLabel: 'Participation',
+  eligibleLabel: 'Votants admissibles',
+  electedSoFar: 'Élus jusqu’ici',
+  comingUp: 'Restent à élire',
+  needToElect: (need, total) => `${need} voix sur ${total} élisent`,
+  withdrawHint: (frac, limit) => `Moins de ${limit} (${frac}) est retiré après ce tour`,
+  notYetHeld: 'pas encore tenu',
+  locale: 'fr',
   opening: (title, whoVotes, colors) => [
     `Nous allons élire ${title} selon la Procédure du Troisième Legs décrite dans Le Manuel du service des AA.`,
     `Qui vote : ${whoVotes}`,

@@ -584,3 +584,299 @@ button.mini,
     display: block !important;
   }
 }
+
+/* ---------- automatic backup ---------- */
+.backup-chip {
+  display: inline-flex;
+  align-items: center;
+}
+.backup-chip .mini {
+  white-space: nowrap;
+}
+
+/* ---------- registration desk ---------- */
+.checkin-matches {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.checkin-matches li {
+  list-style: none;
+}
+.checkin-matches button {
+  width: 100%;
+  text-align: left;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+}
+.checkin-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: flex-start;
+  min-height: 12rem;
+  border: 3px solid var(--pico-muted-border-color);
+}
+.checkin-result.good {
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok-bg) 45%, transparent);
+}
+.checkin-result.bad {
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn-bg) 45%, transparent);
+}
+.checkin-name {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.checkin-role {
+  color: var(--pico-muted-color);
+  font-size: 1.05rem;
+}
+.checkin-history {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--pico-muted-color);
+  columns: 2;
+}
+.checkin-history li {
+  list-style: none;
+}
+.checkin-page .scanner-video {
+  max-width: 100%;
+}
+
+/* ---------- printable voting cards ---------- */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.card {
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--pico-card-background-color);
+}
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--pico-muted-color);
+  gap: 0.5rem;
+}
+.card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.card-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.card-role {
+  font-size: 0.9rem;
+}
+.card-where {
+  font-size: 0.78rem;
+  color: var(--pico-muted-color);
+}
+.card-qr {
+  width: 96px;
+  height: 96px;
+  background: #fff;
+  padding: 3px;
+  border-radius: 3px;
+}
+.card-band {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 0.15rem;
+  border-radius: 3px;
+}
+.card-band.votes {
+  background: var(--ok);
+  color: #fff;
+}
+.card-band.alt {
+  background: var(--warn);
+  color: #000;
+}
+.card-band.novote {
+  background: var(--pico-muted-border-color);
+  color: var(--pico-color);
+}
+
+@media print {
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: 2.4in;
+    gap: 0;
+  }
+  .card {
+    border: 1px dashed #999;
+    border-radius: 0;
+    background: #fff;
+    color: #000;
+    padding: 0.2in;
+    height: 100%;
+    break-inside: avoid;
+  }
+  /* The band sits along the bottom edge of the card, whatever the name's length. */
+  .card-band {
+    margin-top: auto;
+  }
+  .card-name {
+    font-size: 15pt;
+  }
+  .card:nth-child(8n) {
+    break-after: page;
+  }
+  .card:last-child {
+    break-after: auto;
+  }
+  .card-band {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .card-qr {
+    width: 1.05in;
+    height: 1.05in;
+  }
+}
+
+/* ---------- projector extras ---------- */
+.display-clock {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--pico-muted-color);
+  align-self: flex-start;
+  font-variant-numeric: tabular-nums;
+}
+.display-hint {
+  font-size: clamp(1.1rem, 2vw, 1.7rem);
+  color: var(--pico-muted-color);
+  margin-bottom: 0.6rem;
+}
+.display-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  list-style: none;
+  padding: 0.6rem 0 0;
+  margin: 1.2rem 0 0;
+  border-top: 2px solid var(--pico-muted-border-color);
+}
+.display-strip .strip-item {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--pico-muted-border-color);
+  min-width: 9rem;
+  font-size: 1.05rem;
+}
+.display-strip .strip-title {
+  font-weight: 700;
+}
+.display-strip .strip-name {
+  color: var(--pico-muted-color);
+}
+.display-strip .done {
+  background: var(--ok-bg);
+  border-color: var(--ok);
+}
+.display-strip .done .strip-name {
+  color: var(--ok);
+  font-weight: 700;
+}
+.display-strip .current {
+  border: 2px solid var(--info);
+  background: var(--info-bg);
+}
+
+/* ---------- printed report ---------- */
+.report-section {
+  margin-top: 1.6rem;
+}
+.report-elected-inline {
+  color: var(--ok);
+}
+.signatures .sign-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.4rem 2.5rem;
+  margin-top: 1.5rem;
+  max-width: 40rem;
+}
+.sign-rule {
+  border-bottom: 1px solid currentColor;
+  height: 2.2rem;
+}
+.report-foot {
+  margin-top: 2rem;
+  border-top: 1px solid var(--pico-muted-border-color);
+  padding-top: 0.5rem;
+}
+@media print {
+  .report h1 {
+    font-size: 20pt;
+  }
+  .report h2 {
+    font-size: 14pt;
+    border-bottom: 1px solid #000;
+    padding-bottom: 2pt;
+  }
+  .report-log {
+    break-before: page;
+  }
+  .report-log table {
+    font-size: 8.5pt;
+  }
+  .signatures {
+    break-inside: avoid;
+    margin-top: 2rem;
+  }
+  .report-section {
+    break-after: auto;
+  }
+}
+
+/* The projector cannot scroll: the content scales down to fit the screen. */
+.display-fit {
+  transform-origin: top center;
+  width: 100%;
+}
+.display-fitbox {
+  overflow: hidden;
+}
+
+/* The "what to print" buttons wrap on a phone instead of pushing the page wide. */
+@media (max-width: 700px) {
+  .print-kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .print-kinds button {
+    flex: 1 1 45%;
+    border-radius: var(--pico-border-radius) !important;
+    border-left-width: 1px !important;
+  }
+}

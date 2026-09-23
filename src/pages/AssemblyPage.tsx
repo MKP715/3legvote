@@ -6,6 +6,7 @@ import type { ElectionType, Language, Officials, Settings } from '../engine/type
 import { PhaseBadge, VotersBar } from '../components/common';
 import { confirmAction, notify } from '../components/ui';
 import { OpeningScript } from '../components/OpeningScript';
+import { BackupPanel } from '../components/BackupPanel';
 import { LiveControls } from '../components/LiveControls';
 import { exportCsv, exportJson, resultsSummaryText } from '../exporters';
 import { DEFAULT_BALLOT_COLORS, PRESETS, ballotColor } from '../presets';
@@ -73,6 +74,9 @@ export function AssemblyPage() {
           </Link>
           <Link role="button" className="outline" to={`/a/${a.id}/voters`}>
             Roll call ({a.voterRoll.filter((v) => v.present).length}/{a.voterRoll.length})
+          </Link>
+          <Link role="button" className="outline" to={`/a/${a.id}/checkin`}>
+            Check-in desk
           </Link>
           <Link role="button" className="outline" to={`/a/${a.id}/ballots`}>
             Print
@@ -377,6 +381,8 @@ export function AssemblyPage() {
           </fieldset>
         </article>
       </div>
+
+      <BackupPanel assembly={a} />
 
       <article>
         <header>

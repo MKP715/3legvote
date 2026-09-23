@@ -50,12 +50,18 @@ All the arithmetic uses whole numbers, so there are no rounding mistakes.
 - **Virtual poll import**: load a poll or form export as CSV (for example a Zoom poll report, Google Forms or Microsoft Forms). The app finds the answer column, counts each participant once, and treats answers with several names or an unknown name as invalid.
 - Poll text for each ballot, ready to paste into your meeting platform.
 
-**For the room**
-- **Projector display** in a second window, which updates live. It shows "voting open" and "counting" status, the ballot colour, the board, a chart with the two-thirds line, the hat draw, a speaking timer (for example for candidates sharing their service history), and a message.
-- Colour-coded ballots for each round. Printable ballot slips, teller tally sheets, and a large candidate board to post on the wall.
+**Registration desk**
+- **Printable voting cards**, eight to a page, each with a QR code. The code identifies the member within that election only — no name or email is in it.
+- **Check-in desk**: scan cards one after another with a laptop or tablet camera. Each scan shows the member's name, role and whether they have a vote (an alternate is told when their primary is present), with a sound for a good or bad scan. Checking out again is one click, and everything also works by searching for a name.
+- Eligible voter counts update as people arrive and leave, so every ballot uses the right total.
 
-**Records**
-- Printable report (or save as PDF) with the officials, approvals, attendance, every ballot and the audit log.
+**For the room**
+- **Projector display** in a second window, which updates live and **scales itself to fit any screen**, so nothing is ever cut off. It shows: the position and where it sits in the assembly, "voting open" / "counting" status with the ballot colour, the total vote, two-thirds needed, ballots cast, **turnout against eligible voters**, a clock, what it takes to be elected and which withdrawal rule comes next, the board, a chart with the two-thirds line, the hat draw, a speaking timer, a message, and **a strip of every position showing who has been elected so far**.
+- Colour-coded ballots for each round. Printable ballot slips, teller tally sheets, voting cards, and a large candidate board to post on the wall.
+
+**Records and safety**
+- **Automatic backup to a folder you choose** — a USB stick or a synced drive. After every ballot the app writes the whole election there: `latest.json` plus a time-stamped snapshot of each step, so a closed laptop or a cleared browser cannot lose the assembly. (Chrome and Edge; elsewhere the app prompts you to export.)
+- Printable report (or save as PDF), organised as a record for the minutes: assembly details and settings, approvals and officials, a summary of the elections, each position with its board and the chair's announcements, attendance with who had a vote, the full audit log, and signature lines for the chair, secretary and tellers.
 - CSV export and a plain-text results summary.
 - JSON backup and restore, for one election or everything at once.
 - Procedure settings lock once voting starts (unlocking asks first and says how many results could change). Every correction is logged: reopening a ballot for a recount, undoing a motion or draw, or resetting a position.

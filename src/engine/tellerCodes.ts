@@ -34,6 +34,7 @@ export interface TellerResult {
 
 const PREFIX_SETUP = 'TLS1.';
 const PREFIX_RESULT = 'TLR1.';
+const PREFIX_CHECKIN = 'TLC1.';
 
 function toB64Url(s: string): string {
   const bytes = new TextEncoder().encode(s);
@@ -64,10 +65,10 @@ function encode(prefix: string, obj: unknown): string {
   return `${prefix}${body}.${checksum(body)}`;
 }
 
-function decode<T>(prefix: string, code: string): T {
+function decode<T>(prefix: string, code: string, what = 'a Third Legacy teller code'): T {
   const clean = code.trim().replace(/\s+/g, '');
   const at = clean.indexOf(prefix);
-  if (at < 0) throw new Error('That is not a Third Legacy teller code.');
+  if (at < 0) throw new Error(`That is not ${what}.`);
   const rest = clean.slice(at + prefix.length);
   const dot = rest.lastIndexOf('.');
   if (dot < 0) throw new Error('The code is incomplete.');
@@ -90,6 +91,23 @@ export const decodeResult = (code: string) => {
   if (r.v !== 1 || !Array.isArray(r.c) || !r.k || !r.r || !CHANNELS.includes(r.ch)) throw new Error('Unsupported teller report.');
   if (r.c.some((x) => !Number.isInteger(x) || x < 0) || !Number.isInteger(r.i) || r.i < 0) throw new Error('The report contains invalid numbers.');
   return r;
+};
+
+/**
+ * Registration desk: the code printed on a member's voting card. It identifies the person
+ * within one election and nothing else — no name, no email — so a dropped card reveals nothing.
+ */
+export interface CheckinCode {
+  v: 1;
+  a: string; // assembly id
+  i: string; // voter id
+}
+
+export const encodeCheckin = (c: CheckinCode) => encode(PREFIX_CHECKIN, c);
+export const decodeCheckin = (code: string) => {
+  const c = decode<CheckinCode>(PREFIX_CHECKIN, code, 'a voting card for this app');
+  if (c.v !== 1 || typeof c.a !== 'string' || typeof c.i !== 'string' || !c.a || !c.i) throw new Error('That voting card is not readable.');
+  return c;
 };
 
 /** Link a teller opens on their own device. */
