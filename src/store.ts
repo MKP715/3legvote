@@ -241,6 +241,36 @@ export function normalizeAssembly(raw: unknown): Assembly {
   } as Assembly;
 }
 
+/**
+ * One saved assembly, brought up to the shape this version of the app expects.
+ *
+ * Anything saved by an older version is missing whatever fields have been added since
+ * (a 1.2 record has no agenda, motions or badge design), so every rehydration goes
+ * through here rather than trusting the stored shape. Unlike an imported file, the
+ * projector's live state is kept: the chair's own window and the display window share
+ * storage, and a reload in the middle of a vote must not reset what the room is seeing.
+ */
+export function assemblyFromStorage(raw: unknown): Assembly {
+  const a = normalizeAssembly(raw);
+  const live = (raw as Partial<Assembly> | null)?.live;
+  return live && typeof live === 'object' ? { ...a, live: { ...idleLive(), ...live } } : a;
+}
+
+/** Every saved assembly, skipping (and reporting) any single record that cannot be read. */
+export function assembliesFromStorage(persisted: unknown): Assembly[] {
+  const s = persisted as { assemblies?: unknown[] } | null;
+  const out: Assembly[] = [];
+  for (const a of s?.assemblies ?? []) {
+    try {
+      out.push(assemblyFromStorage(a));
+    } catch {
+      const name = (a as { name?: string })?.name;
+      onStorageError?.(`One saved election (${name ?? 'unnamed'}) could not be read and was skipped.`);
+    }
+  }
+  return out;
+}
+
 /** Eligible voters present per channel — from the roll call when enabled, else the manual counts. */
 export function effectiveVoters(a: Assembly): Record<Channel, number> {
   if (a.useRollForCounts) return computeEligibility(a.voterRoll, a.roles).byChannel;
@@ -1308,22 +1338,14 @@ export const useStore = create<Store>()(
     }),
     {
       name: STORAGE_KEY,
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => persistentStorage ?? localStorage),
-      migrate: (persisted) => {
-        // One unreadable record must never wipe the rest of someone's elections.
-        const s = persisted as { assemblies?: unknown[] };
-        const out: Assembly[] = [];
-        for (const a of s?.assemblies ?? []) {
-          try {
-            out.push(normalizeAssembly(a));
-          } catch {
-            const name = (a as { name?: string })?.name;
-            onStorageError?.(`One saved election (${name ?? 'unnamed'}) could not be read and was skipped.`);
-          }
-        }
-        return { assemblies: out } as unknown as Store;
-      },
+      migrate: (persisted) => ({ assemblies: assembliesFromStorage(persisted) }) as unknown as Store,
+      // `migrate` only runs when the version number changes, which is one release behind
+      // every time a field is added. `merge` runs on every hydration — start-up and the
+      // cross-window sync — so a record saved by any earlier version is filled in before
+      // any screen reads it, and one unreadable record never wipes the rest.
+      merge: (persisted, current) => ({ ...current, assemblies: assembliesFromStorage(persisted) }),
     },
   ),
 );
