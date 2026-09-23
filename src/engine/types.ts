@@ -187,6 +187,10 @@ export interface Voter {
   id: string;
   name: string;
   roleId: string;
+  /** Registration options this member is signed up for (see Assembly.attendanceOptions). */
+  attending?: string[];
+  /** Values for the assembly's own extra fields (see Assembly.voterFields). */
+  custom?: Record<string, string>;
   /** Group, district or area the voter represents — used to pair alternates with primaries. */
   group: string;
   district: string;
@@ -223,6 +227,244 @@ export interface Live {
   timer: LiveTimer | null;
   /** Free-text message shown large on the projector (e.g. "Break — back at 2:15"). */
   message: string;
+  /** What the projector is showing. */
+  screen?: 'election' | 'agenda' | 'motion' | 'conference';
+  agendaItemId?: string | null;
+  motionId?: string | null;
+  conferenceItemId?: string | null;
+  /** Manual zoom on top of the automatic fit (1 = as calculated). */
+  zoom?: number;
+  /** High-contrast projector theme for washed-out screens. */
+  highContrast?: boolean;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Assembly business: motions, Conference agenda items, agenda          */
+/* ------------------------------------------------------------------ */
+
+/** Motion types from The A.A. Service Manual, Appendix W. */
+export type MotionKind = 'main' | 'committee' | 'amend' | 'table' | 'recommit' | 'callQuestion' | 'reconsider' | 'floor' | 'decline';
+
+export type VoteThreshold = 'twoThirds' | 'simpleMajority' | 'threeQuarters';
+
+export type VoteMethod = 'hands' | 'ballot' | 'poll' | 'voice';
+
+export interface MotionVoteCount {
+  yes: number;
+  no: number;
+  abstain: number;
+}
+
+export interface MotionSettings {
+  /** Default for a new main motion. Matters of policy take substantial unanimity. */
+  defaultThreshold: VoteThreshold;
+  /** Whether abstentions count toward the total the threshold is measured against. */
+  countAbstentions: boolean;
+  /** Quorum needed to do business (the Conference uses two-thirds of registered members). */
+  quorum: { kind: 'none' | 'fraction' | 'count'; fraction?: number; count?: number };
+  /** Seconds each person may speak (the Conference allows two minutes). */
+  speakerSeconds: number;
+}
+
+export const DEFAULT_MOTION_SETTINGS: MotionSettings = {
+  defaultThreshold: 'twoThirds',
+  countAbstentions: false,
+  quorum: { kind: 'none' },
+  speakerSeconds: 120,
+};
+
+/** One recorded vote: the main question, an amendment, or a procedural motion. */
+export interface MotionRound {
+  id: string;
+  kind: MotionKind;
+  /** What was voted on, in words (the amendment's text, for instance). */
+  label: string;
+  text?: string;
+  movedBy: string;
+  secondedBy: string;
+  threshold: VoteThreshold;
+  method: VoteMethod;
+  counts: Record<Channel, MotionVoteCount>;
+  carried: boolean;
+  quorumMet: boolean;
+  /** Voting members present when the vote was taken. */
+  eligible: number;
+  at: string;
+  note?: string;
+  /** The side that did not prevail is invited to speak (Appendix W). */
+  minority?: { heard: boolean; side: 'for' | 'against'; notes: string };
+}
+
+export interface Motion {
+  id: string;
+  number: number;
+  kind: MotionKind;
+  title: string;
+  text: string;
+  background: string;
+  movedBy: string;
+  secondedBy: string;
+  committee?: string;
+  threshold: VoteThreshold;
+  status: 'open' | 'carried' | 'defeated' | 'tabled' | 'withdrawn' | 'recommitted';
+  /** Amendments and procedural votes, in the order they happened, then the main vote(s). */
+  rounds: MotionRound[];
+  /** Speakers heard for and against, so the chair can balance debate. */
+  speakers: { for: number; against: number };
+  notes: string;
+  /** An action may not be reconsidered twice (Appendix W). */
+  reconsidered: boolean;
+  createdAt: string;
+  decidedAt?: string;
+}
+
+export interface ConferenceOption {
+  id: string;
+  label: string;
+}
+
+export interface ConferenceRound {
+  id: string;
+  /** optionId → votes, per channel. */
+  counts: Record<Channel, Record<string, number>>;
+  abstain: Record<Channel, number>;
+  method: VoteMethod;
+  at: string;
+  note?: string;
+}
+
+/** An item on the General Service Conference agenda, brought to the area for its sense. */
+export interface ConferenceItem {
+  id: string;
+  committee: string;
+  /** e.g. "Literature — Item 3". */
+  reference: string;
+  title: string;
+  /** Background material summary, and links to it. */
+  background: string;
+  links: { id: string; label: string; url: string }[];
+  options: ConferenceOption[];
+  rounds: ConferenceRound[];
+  /** Notes taken while the assembly discusses the item. */
+  notes: string;
+  /** What the delegate will carry to the Conference. */
+  delegateNote: string;
+  presenter?: string;
+  status: 'toDiscuss' | 'discussed' | 'polled';
+  createdAt: string;
+}
+
+export interface ConferenceSettings {
+  /** Which Conference this is for, e.g. "76th (2026)". */
+  session: string;
+  defaultOptions: ConferenceOption[];
+  /** Shown on every item: the area's sense guides the delegate, who votes their conscience. */
+  guidanceNote: string;
+}
+
+export const DEFAULT_CONFERENCE_OPTIONS: ConferenceOption[] = [
+  { id: 'support', label: 'Support as written' },
+  { id: 'supportWithChanges', label: 'Support with changes' },
+  { id: 'oppose', label: 'Do not support' },
+  { id: 'noAction', label: 'No action / more information needed' },
+];
+
+export type AgendaKind = 'segment' | 'report' | 'break' | 'meal' | 'election' | 'motion' | 'conference' | 'workshop';
+
+export interface AgendaItem {
+  id: string;
+  title: string;
+  kind: AgendaKind;
+  plannedMinutes: number;
+  presenter: string;
+  notes: string;
+  /** Position, motion or Conference item this segment runs. */
+  linkId?: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Name badges / voting cards                                          */
+/* ------------------------------------------------------------------ */
+
+export interface BadgeLink {
+  id: string;
+  label: string;
+  url: string;
+  /** Print it as a QR code as well as text. */
+  qr: boolean;
+}
+
+export interface BadgeDesign {
+  perPage: 4 | 6 | 8;
+  doubleSided: boolean;
+  /** How the printer turns the paper, so the backs line up with the fronts. */
+  duplexFlip: 'long' | 'short';
+  title: string;
+  subtitle: string;
+  accent: string;
+  logoDataUrl?: string;
+  front: {
+    showRole: boolean;
+    showGroup: boolean;
+    showDistrict: boolean;
+    showChannel: boolean;
+    showAttendance: boolean;
+    showCheckinQr: boolean;
+    showBand: boolean;
+    showCustomFields: boolean;
+    extraText: string;
+  };
+  back: {
+    heading: string;
+    text: string;
+    links: BadgeLink[];
+    showAgenda: boolean;
+    showQrCaptions: boolean;
+  };
+}
+
+export const DEFAULT_BADGE_DESIGN: BadgeDesign = {
+  perPage: 8,
+  doubleSided: false,
+  duplexFlip: 'long',
+  title: '',
+  subtitle: '',
+  accent: '#1d4ed8',
+  front: {
+    showRole: true,
+    showGroup: true,
+    showDistrict: true,
+    showChannel: true,
+    showAttendance: true,
+    showCheckinQr: true,
+    showBand: true,
+    showCustomFields: false,
+    extraText: '',
+  },
+  back: {
+    heading: 'Useful links',
+    text: '',
+    links: [],
+    showAgenda: false,
+    showQrCaptions: true,
+  },
+};
+
+/** Registration options a member can be signed up for (assembly, convention, banquet…). */
+export interface AttendanceOption {
+  id: string;
+  label: string;
+  /** Printed on the badge when the member is signed up. */
+  showOnBadge: boolean;
+}
+
+export interface VoterField {
+  id: string;
+  label: string;
+  showOnBadge: boolean;
 }
 
 export interface Assembly {
@@ -244,6 +486,19 @@ export interface Assembly {
   approvals: { procedure: string | null; order: string | null; whoVotes: string | null };
   settings: Settings;
   positions: Position[];
+  /** Motions and other business put to the assembly. */
+  motions: Motion[];
+  motionSettings: MotionSettings;
+  /** General Service Conference agenda items brought to the assembly for its sense. */
+  conferenceItems: ConferenceItem[];
+  conferenceSettings: ConferenceSettings;
+  /** The running order for the day. */
+  agenda: AgendaItem[];
+  /** Clock time the assembly is planned to start, e.g. "09:00". */
+  agendaStart: string;
+  badge: BadgeDesign;
+  attendanceOptions: AttendanceOption[];
+  voterFields: VoterField[];
   livePositionId: string | null;
   live: Live;
   /** Show the in-person / virtual split on the projector display. */

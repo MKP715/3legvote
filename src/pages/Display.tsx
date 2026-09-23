@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router';
-import { effectiveVoters, useAssembly } from '../store';
+import { effectiveVoters, useAssembly, useStore } from '../store';
 import { computePosition, fmtLimit } from '../engine/thirdLegacy';
-import type { Assembly, Language, Position } from '../engine/types';
+import type { Assembly, ConferenceItem, Language, Motion, Position } from '../engine/types';
+import { addMinutes, elapsedMinutes, scheduleAgenda, tallyConferenceItem, tallyMotion } from '../engine/business';
+import { AGENDA_KIND_ICON } from '../agendaTemplates';
 import { ballotAnnouncement, nameOf } from '../announce';
 import { Board } from '../components/Board';
 import { BallotChart } from '../components/BallotChart';
 import { TimerFace } from '../components/LiveControls';
 import { ballotColor } from '../presets';
 import { listL, t } from '../i18n';
+import { r as reportDict } from '../reportI18n';
 
 export function displayUrl(aid: string): string {
   return `${window.location.href.split('#')[0]}#/display/${aid}`;
@@ -81,6 +84,16 @@ function Clock({ locale }: { locale: string }) {
   return <span className="display-clock">{now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</span>;
 }
 
+/** Re-renders on an interval, so elapsed times on the projector stay honest. */
+function useMinuteTick(active: boolean) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 15000);
+    return () => window.clearInterval(id);
+  }, [active]);
+}
+
 /** The whole assembly at a glance: what is filled, what is happening, what is left. */
 function PositionStrip({ assembly, current, lang }: { assembly: Assembly; current: Position; lang: Language }) {
   const d = t(lang);
@@ -102,12 +115,14 @@ function PositionStrip({ assembly, current, lang }: { assembly: Assembly; curren
 }
 
 /**
- * Projector / shared-screen view. Opens in its own window and follows whichever
- * position the chair marks as live. Updates automatically from the chair's window.
+ * Projector / shared-screen view. Opens in its own window and follows whichever screen the
+ * chair puts up — an election, the agenda, a motion or a Conference agenda item. Updates
+ * automatically from the chair's window.
  */
 export function Display() {
   const { aid } = useParams();
   const assembly = useAssembly(aid);
+  const setZoom = useStore((s) => s.setZoom);
   const position = assembly?.positions.find((p) => p.id === assembly.livePositionId) ?? assembly?.positions.find((p) => p.started);
   const state = useMemo(() => (assembly && position ? computePosition(position, assembly.settings) : null), [assembly, position]);
 
@@ -116,9 +131,32 @@ export function Display() {
     return () => document.body.classList.remove('display-mode');
   }, []);
 
-  const fit = useFitToScreen();
+  // The projector window has its own keyboard: + and − size the screen for the room, 0 resets.
+  const zoom = assembly?.live.zoom ?? 1;
+  useEffect(() => {
+    if (!assembly) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === '+' || e.key === '=') setZoom(assembly.id, zoom + 0.05);
+      else if (e.key === '-' || e.key === '_') setZoom(assembly.id, zoom - 0.05);
+      else if (e.key === '0') setZoom(assembly.id, 1);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [assembly, zoom, setZoom]);
 
-  if (!assembly) return <main className="display"><h1>—</h1></main>;
+  const fit = useFitToScreen();
+  const screen = assembly?.live.screen ?? 'election';
+  useMinuteTick(screen === 'agenda');
+
+  if (!assembly)
+    return (
+      <main className="display">
+        <h1>—</h1>
+      </main>
+    );
+
   const lang = assembly.language;
   const d = t(lang);
   const live = assembly.live;
@@ -131,23 +169,104 @@ export function Display() {
     </>
   );
 
-  if (!position || !state) {
-    return (
-      <main className="display">
-        <div className="display-fitbox" style={{ height: fit.boxHeight }}>
-        <div ref={fit.ref} className="display-fit" style={{ transform: `scale(${fit.scale})` }}>
-          <header className="display-head">
-            <div>
-              <div className="display-assembly">{assembly.name}</div>
-              <h1>{assembly.date}</h1>
+  const frame = (children: ReactNode, centred = false) => (
+    <main className={`display ${live.highContrast ? 'display-hc' : ''} ${centred ? 'display-centred' : ''}`}>
+      <div className="display-fitbox" style={{ height: fit.boxHeight ? fit.boxHeight * zoom : undefined }}>
+        <div
+          ref={fit.ref}
+          className="display-fit"
+          // Laid out in a canvas 1/zoom as wide and scaled back up, kept centred on the wall.
+          style={{ width: `${100 / zoom}%`, marginLeft: `${(100 - 100 / zoom) / 2}%`, transform: `scale(${fit.scale * zoom})` }}
+        >
+          {children}
+        </div>
+      </div>
+    </main>
+  );
+
+  const head = (line: string, title: string) => (
+    <header className="display-head">
+      <div>
+        <div className="display-assembly">{line}</div>
+        <h1>{title}</h1>
+      </div>
+      <Clock locale={d.locale} />
+    </header>
+  );
+
+  /* ---------------- agenda ---------------- */
+  if (screen === 'agenda') {
+    const current = assembly.agenda.find((i) => i.id === live.agendaItemId && !i.endedAt) ?? assembly.agenda.find((i) => i.startedAt && !i.endedAt) ?? null;
+    const index = current ? assembly.agenda.findIndex((i) => i.id === current.id) : -1;
+    const next = index >= 0 ? assembly.agenda[index + 1] : assembly.agenda.find((i) => !i.startedAt);
+    const plan = scheduleAgenda(assembly.agenda);
+    const used = current ? elapsedMinutes(current.startedAt, current.endedAt) : null;
+    const drift = current && used !== null ? used - current.plannedMinutes : null;
+    return frame(
+      <>
+        {head([assembly.name, assembly.date].filter(Boolean).join(' · '), d.screens.agendaTitle)}
+        {extras}
+        {current && (
+          <div className="display-now">
+            <div className="now-label">{d.screens.now}</div>
+            <div className="now-title">
+              {AGENDA_KIND_ICON[current.kind]} {current.title}
             </div>
-            <Clock locale={d.locale} />
-          </header>
-          {extras}
-          <p className="display-msg">{d.waiting}</p>
-        </div>
-        </div>
-      </main>
+            {current.presenter && <div className="display-sub">{current.presenter}</div>}
+            <div className="now-times">
+              <span>
+                {used ?? 0} / {current.plannedMinutes} {d.screens.planned}
+              </span>
+              {drift !== null && (
+                <span className={drift > 2 ? 'over' : ''}>
+                  {drift > 2 ? d.screens.behind(drift) : drift < -2 ? d.screens.left(-drift) : d.screens.onTime}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {next && (
+          <div className="display-next">
+            <span className="next-label">{d.screens.upNext}</span> {AGENDA_KIND_ICON[next.kind]} {next.title}
+          </div>
+        )}
+        <ol className="display-agenda">
+          {assembly.agenda.map((item, i) => (
+            <li key={item.id} className={`${item.id === current?.id ? 'current' : ''} ${item.endedAt ? 'done' : ''}`}>
+              <span className="t">
+                {addMinutes(assembly.agendaStart, plan[i].plannedStartMin)}
+              </span>
+              <span className="k">{AGENDA_KIND_ICON[item.kind]}</span>
+              <span className="n">{item.title}</span>
+              <span className="m">{item.plannedMinutes}′</span>
+            </li>
+          ))}
+        </ol>
+      </>,
+    );
+  }
+
+  /* ---------------- a motion on the floor ---------------- */
+  if (screen === 'motion') {
+    const motion = assembly.motions.find((m) => m.id === live.motionId) ?? assembly.motions[assembly.motions.length - 1] ?? null;
+    if (motion)
+      return frame(<MotionScreen assembly={assembly} motion={motion} lang={lang} head={head} extras={extras} eligible={eligibleTotal} />, true);
+  }
+
+  /* ---------------- a Conference agenda item ---------------- */
+  if (screen === 'conference') {
+    const item = assembly.conferenceItems.find((c) => c.id === live.conferenceItemId) ?? assembly.conferenceItems[0] ?? null;
+    if (item) return frame(<ConferenceScreen assembly={assembly} item={item} lang={lang} head={head} extras={extras} />, true);
+  }
+
+  /* ---------------- elections ---------------- */
+  if (!position || !state) {
+    return frame(
+      <>
+        {head(assembly.name, assembly.date)}
+        {extras}
+        <p className="display-msg">{d.waiting}</p>
+      </>,
     );
   }
 
@@ -192,10 +311,8 @@ export function Display() {
   const tallBoard = position.candidates.length + state.ballots.length > 9;
   const turnout = last && eligibleTotal > 0 ? Math.round((last.cast.total / eligibleTotal) * 100) : null;
 
-  return (
-    <main className="display">
-      <div className="display-fitbox" style={{ height: fit.boxHeight }}>
-      <div ref={fit.ref} className="display-fit" style={{ transform: `scale(${fit.scale})` }}>
+  return frame(
+    <>
       <header className="display-head">
         <div>
           <div className="display-assembly">
@@ -320,8 +437,177 @@ export function Display() {
       )}
 
       {assembly.positions.length > 1 && <PositionStrip assembly={assembly} current={position} lang={lang} />}
-      </div>
-      </div>
-    </main>
+    </>,
   );
+}
+
+type Head = (line: string, title: string) => ReactNode;
+
+/** The motion as the room needs to see it: the wording, the threshold, and the result. */
+function MotionScreen({
+  assembly,
+  motion,
+  lang,
+  head,
+  extras,
+  eligible,
+}: {
+  assembly: Assembly;
+  motion: Motion;
+  lang: Language;
+  head: Head;
+  extras: ReactNode;
+  eligible: number;
+}) {
+  const d = t(lang);
+  const rd = reportDict(lang);
+  const round = motion.rounds[motion.rounds.length - 1] ?? null;
+  const result = round ? tallyMotion(round.counts, round.threshold, assembly.motionSettings, round.eligible || eligible) : null;
+  const pending = round?.minority && !round.minority.heard ? round.minority : null;
+  return (
+    <>
+      {head(`${assembly.name} · ${d.screens.motionOnFloor}`, motion.title || `#${motion.number}`)}
+      {extras}
+      <div className="display-motion-text">{motion.text}</div>
+      <div className="display-sub">
+        {rd.motionKinds[motion.kind]} · {rd.thresholds[motion.threshold]}
+        {motion.movedBy && ` · ${d.screens.moved} ${motion.movedBy}`}
+        {motion.secondedBy && ` · ${d.screens.seconded} ${motion.secondedBy}`}
+        {motion.status !== 'open' && ` · ${rd.motionStatus[motion.status]}`}
+      </div>
+      {!result && (
+        <div className="display-hint">
+          {d.screens.speakers}: {d.screens.yes} {motion.speakers.for} · {d.screens.no} {motion.speakers.against}
+        </div>
+      )}
+      {result && (
+        <>
+          <div className="display-roundlabel">{rd.motionKinds[round!.kind]}</div>
+          <div className={`display-verdict ${result.carried ? 'carried' : 'defeated'}`}>{result.carried ? d.screens.carried : d.screens.defeated}</div>
+          <div className="display-tally">
+            <div>
+              <span>{d.screens.yes}</span>
+              <strong>{result.yes}</strong>
+            </div>
+            <div>
+              <span>{d.screens.no}</span>
+              <strong>{result.no}</strong>
+            </div>
+            <div>
+              <span>{d.screens.abstain}</span>
+              <strong>{result.abstain}</strong>
+            </div>
+            <div>
+              <span>{d.screens.needed}</span>
+              <strong>{result.needed}</strong>
+            </div>
+            <div>
+              <span>{d.screens.votesCast}</span>
+              <strong>{result.votesCast}</strong>
+            </div>
+          </div>
+          <div className="display-bar">
+            <div className="bar-yes" style={{ width: `${result.votesCast ? (result.yes / result.votesCast) * 100 : 0}%` }} />
+            <div className="bar-mark" style={{ left: `${result.votesCast ? (result.needed / result.votesCast) * 100 : 0}%` }} />
+          </div>
+          <div className="display-hint">
+            {round!.threshold === 'twoThirds' ? d.screens.substantialUnanimity : rd.thresholds[round!.threshold]}
+            {!result.quorumMet && ` · ${d.screens.quorumNotMet}`}
+          </div>
+          {pending && (
+            <div className="display-status status-counting">
+              {d.screens.minorityInvited(pending.side === 'for' ? d.screens.forSide : d.screens.againstSide)}
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+/** A Conference agenda item: what is being asked, and where the assembly stands. */
+function ConferenceScreen({
+  assembly,
+  item,
+  lang,
+  head,
+  extras,
+}: {
+  assembly: Assembly;
+  item: ConferenceItem;
+  lang: Language;
+  head: Head;
+  extras: ReactNode;
+}) {
+  const d = t(lang);
+  const round = item.rounds[item.rounds.length - 1] ?? null;
+  const result = round ? tallyConferenceItem(round.counts, round.abstain, item.options) : null;
+  const title = [item.committee, item.reference].filter(Boolean).join(' · ');
+  return (
+    <>
+      {head(`${assembly.name} · ${d.screens.conferenceItem}${title ? ` · ${title}` : ''}`, item.title)}
+      {extras}
+      {item.background && <div className="display-background">{item.background}</div>}
+      {!result ? (
+        <>
+          <div className="display-hint">{d.screens.choices}</div>
+          <ul className="display-choices">
+            {item.options.map((o) => (
+              <li key={o.id}>{o.label}</li>
+            ))}
+          </ul>
+          <div className="display-msg small">{d.screens.notPolled}</div>
+        </>
+      ) : (
+        <>
+          <ul className="display-results">
+            {result.options.map((o) => (
+              <li key={o.id} className={result.leading?.id === o.id ? 'lead' : ''}>
+                <span className="label">{o.label}</span>
+                <span className="track">
+                  <span className="fill" style={{ width: `${o.pct}%` }} />
+                </span>
+                <span className="votes">
+                  {o.votes} · {Math.round(o.pct)}%
+                </span>
+              </li>
+            ))}
+            <li className="abstain">
+              <span className="label">{d.screens.abstain}</span>
+              <span className="track" />
+              <span className="votes">{result.abstainTotal}</span>
+            </li>
+          </ul>
+          <div className="display-sense">
+            <span>{d.screens.senseLabel}</span>
+            <strong>{senseLine(result, lang)}</strong>
+          </div>
+          <div className="display-hint">
+            {d.screens.totalVoteShort}: {result.totalVote}
+          </div>
+        </>
+      )}
+      {assembly.conferenceSettings.guidanceNote && <div className="display-guidance">{assembly.conferenceSettings.guidanceNote}</div>}
+    </>
+  );
+}
+
+
+/** The sense of the assembly in the room's language. */
+function senseLine(result: ReturnType<typeof tallyConferenceItem>, lang: Language): string {
+  const d = t(lang);
+  const pct = Math.round(result.leading?.pct ?? 0);
+  const label = result.leading?.label ?? '';
+  switch (result.senseKind) {
+    case 'unanimity':
+      return d.screens.senseUnanimity(label, pct);
+    case 'majority':
+      return d.screens.senseMajority(label, pct);
+    case 'plurality':
+      return d.screens.sensePlurality(label, pct);
+    case 'tied':
+      return d.screens.senseTied;
+    default:
+      return '';
+  }
 }

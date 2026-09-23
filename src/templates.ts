@@ -92,3 +92,44 @@ export function candidateTemplate(): Record<string, string>[] {
     { Name: 'Elena F.', District: 'District 12', Note: '' },
   ];
 }
+
+/** Sample Conference agenda items, so an area can prepare the list before importing it. */
+export function conferenceItemTemplate(): Record<string, string>[] {
+  return [
+    {
+      Committee: 'Literature',
+      Reference: 'Item 1',
+      Title: 'Consider a request for a new pamphlet for the family of the alcoholic',
+      Background: 'Background material: request from an area, draft outline, cost estimate.',
+      Link: 'https://example.org/background/literature-item-1.pdf',
+    },
+    {
+      Committee: 'Literature',
+      Reference: 'Item 2',
+      Title: 'Review the pamphlet "A.A. for the Older Alcoholic"',
+      Background: 'Five-year review; current text and circulation figures attached.',
+      Link: '',
+    },
+    {
+      Committee: 'Corrections',
+      Reference: 'Item 1',
+      Title: 'Consider revised text for the Corrections Workbook',
+      Background: 'Draft revision incorporating shared experience from correctional facilities.',
+      Link: 'https://example.org/background/corrections-item-1.pdf',
+    },
+    {
+      Committee: 'Finance',
+      Reference: 'Item 3',
+      Title: 'Review the suggested contribution limit for individual members',
+      Background: 'Trustees’ Finance Committee report on the annual limit and bequests.',
+      Link: '',
+    },
+    {
+      Committee: 'Policy / Admissions',
+      Reference: 'Item 1',
+      Title: 'Review the composition, scope and procedure of the Conference',
+      Background: 'Annual review item; see Appendix W of The A.A. Service Manual.',
+      Link: '',
+    },
+  ];
+}

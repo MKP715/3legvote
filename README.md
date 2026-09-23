@@ -50,6 +50,18 @@ All the arithmetic uses whole numbers, so there are no rounding mistakes.
 - **Virtual poll import**: load a poll or form export as CSV (for example a Zoom poll report, Google Forms or Microsoft Forms). The app finds the answer column, counts each participant once, and treats answers with several names or an unknown name as invalid.
 - Poll text for each ballot, ready to paste into your meeting platform.
 
+**The rest of the assembly's business**
+- **Motions and substantial unanimity** (Appendix W). Record yes / no / abstain in the room and online; the app shows how many votes are needed *before* you record anything, checks the quorum, and decides the motion. Two-thirds for matters of policy, "one-half of votes cast plus one" for routine matters, three-quarters where an area requires it. Abstentions are not votes cast unless your area says they are.
+- Amend, table, recommit, call the question, decline to consider and reconsider, each with the second, debatability and vote the Service Manual gives it. A committee recommendation needs no second; nothing may be reconsidered twice. Carrying an amendment rewrites the motion; tabling and recommitting set its status.
+- **The side that did not prevail is always invited to speak** — the app names it, records what was said, and offers the motion to reconsider.
+- Speaker counts for and against, and a two-minute speaker timer on the projector.
+- **Conference agenda items**: each with its committee, background and links (printed as QR codes), the notes taken during the discussion, and a poll of the room and the online voters on whatever choices you set. The result is reported as the **sense of the assembly** and says whether it reached substantial unanimity or only a simple majority. A note for the delegate on every item, and a CSV delegate report for the lot. Items import from a spreadsheet; the thirteen Conference committees are built in.
+- **Agenda runner**: load a sample format from Appendix D (election assembly, regular assembly, pre-Conference), set the start time, and the app lays out the clock times. Start an item and it tracks minutes used against minutes planned, with one-click "finish and start the next".
+
+**Registration and badges**
+- Registration options — assembly, convention, banquet, or whatever your area uses — and any extra detail the registrar collects, both editable and saved with the assembly.
+- **Name badges**, 4, 6 or 8 to a sheet, single- or **double-sided** (the backs are laid out mirrored so each lands behind its own front, for long- or short-edge duplex). Your own heading, colour and logo; the member's service position, group, district, what they are signed up for and their check-in QR code; and a back with your own text, the day's agenda, and any links you provide printed as QR codes. The design is saved, so the same badges reprint all weekend.
+
 **Registration desk**
 - **Printable voting cards**, eight to a page, each with a QR code. The code identifies the member within that election only — no name or email is in it.
 - **Check-in desk**: scan cards one after another with a laptop or tablet camera. Each scan shows the member's name, role and whether they have a vote (an alternate is told when their primary is present), with a sound for a good or bad scan. Checking out again is one click, and everything also works by searching for a name.
@@ -57,11 +69,13 @@ All the arithmetic uses whole numbers, so there are no rounding mistakes.
 
 **For the room**
 - **Projector display** in a second window, which updates live and **scales itself to fit any screen**, so nothing is ever cut off. It shows: the position and where it sits in the assembly, "voting open" / "counting" status with the ballot colour, the total vote, two-thirds needed, ballots cast, **turnout against eligible voters**, a clock, what it takes to be elected and which withdrawal rule comes next, the board, a chart with the two-thirds line, the hat draw, a speaking timer, a message, and **a strip of every position showing who has been elected so far**.
+- The projector also shows **the agenda** (what is happening now, what is next, and whether the day is running over), **a motion** with its wording, running tally and the two-thirds mark, and **a Conference item** with the choices and the sense of the assembly — all in the room's language.
+- **Zoom the projector** for the room from the chair's window or with + / − / 0 on the projector itself, and a **high-contrast theme** for a washed-out screen or a bright hall.
 - Colour-coded ballots for each round. Printable ballot slips, teller tally sheets, voting cards, and a large candidate board to post on the wall.
 
 **Records and safety**
 - **Automatic backup to a folder you choose** — a USB stick or a synced drive. After every ballot the app writes the whole election there: `latest.json` plus a time-stamped snapshot of each step, so a closed laptop or a cleared browser cannot lose the assembly. (Chrome and Edge; elsewhere the app prompts you to export.)
-- Printable report (or save as PDF), organised as a record for the minutes: assembly details and settings, approvals and officials, a summary of the elections, each position with its board and the chair's announcements, attendance with who had a vote, the full audit log, and signature lines for the chair, secretary and tellers.
+- Printable report (or save as PDF) **in English, Spanish or French** — headings, table columns and standing notes, not only the announcements. Organised as a record for the minutes: assembly details and settings, approvals and officials, a summary of the elections, each position with its board and the chair's announcements, every motion with the vote that decided it and the minority opinion, the Conference items with the sense of the assembly, the agenda as it actually ran, attendance with who had a vote, the full audit log, and signature lines for the chair, secretary and tellers.
 - CSV export and a plain-text results summary.
 - JSON backup and restore, for one election or everything at once.
 - Procedure settings lock once voting starts (unlocking asks first and says how many results could change). Every correction is logged: reopening a ballot for a recount, undoing a motion or draw, or resetting a position.

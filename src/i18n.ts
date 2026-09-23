@@ -100,10 +100,85 @@ type Dict = {
   needToElect: (need: number, total: number) => string;
   withdrawHint: (frac: string, limit: string) => string;
   notYetHeld: string;
+  /** Projector screens for the agenda, motions and Conference items. */
+  screens: {
+    agendaTitle: string;
+    now: string;
+    upNext: string;
+    planned: string;
+    actual: string;
+    onTime: string;
+    behind: (m: number) => string;
+    ahead: (m: number) => string;
+    left: (m: number) => string;
+    motionOnFloor: string;
+    moved: string;
+    seconded: string;
+    votesCast: string;
+    needed: string;
+    carried: string;
+    defeated: string;
+    yes: string;
+    no: string;
+    abstain: string;
+    quorumNotMet: string;
+    substantialUnanimity: string;
+    minorityInvited: (side: string) => string;
+    forSide: string;
+    againstSide: string;
+    speakers: string;
+    conferenceItem: string;
+    committee: string;
+    choices: string;
+    senseLabel: string;
+    notPolled: string;
+    senseUnanimity: (label: string, pct: number) => string;
+    senseMajority: (label: string, pct: number) => string;
+    sensePlurality: (label: string, pct: number) => string;
+    senseTied: string;
+    totalVoteShort: string;
+  };
   locale: string;
 };
 
 const EN: Dict = {
+  screens: {
+    agendaTitle: 'Agenda',
+    now: 'Now',
+    upNext: 'Up next',
+    planned: 'planned',
+    actual: 'so far',
+    onTime: 'on time',
+    behind: (m) => `${m} min over`,
+    ahead: (m) => `${m} min early`,
+    left: (m) => `${m} min left`,
+    motionOnFloor: 'Motion on the floor',
+    moved: 'Moved by',
+    seconded: 'Seconded by',
+    votesCast: 'Votes cast',
+    needed: 'Needed to carry',
+    carried: 'CARRIED',
+    defeated: 'DEFEATED',
+    yes: 'Yes',
+    no: 'No',
+    abstain: 'Abstain',
+    quorumNotMet: 'Quorum not met',
+    substantialUnanimity: 'Substantial unanimity — two-thirds of the members voting',
+    minorityInvited: (side) => `The minority is invited to speak — ${side}`,
+    forSide: 'those in favour',
+    againstSide: 'those against',
+    speakers: 'Speakers',
+    conferenceItem: 'Conference agenda item',
+    committee: 'Committee',
+    choices: 'The assembly is asked',
+    senseLabel: 'Sense of the assembly',
+    notPolled: 'Discussion — no vote taken yet',
+    senseUnanimity: (label, pct) => `${label} — substantial unanimity (${pct}%)`,
+    senseMajority: (label, pct) => `${label} — simple majority only (${pct}%)`,
+    sensePlurality: (label, pct) => `${label} leads with ${pct}%`,
+    senseTied: 'No clear sense — the leading choices are tied',
+    totalVoteShort: 'Total vote',
+  },
   ballot: (n) => `${ordinalL(n, 'en')} ballot`,
   finalBallot: 'final',
   confirmationBallot: 'confirmation ballot',
@@ -208,6 +283,43 @@ const EN: Dict = {
 };
 
 const ES: Dict = {
+  screens: {
+    agendaTitle: 'Orden del día',
+    now: 'Ahora',
+    upNext: 'A continuación',
+    planned: 'previsto',
+    actual: 'transcurrido',
+    onTime: 'a tiempo',
+    behind: (m) => `${m} min de retraso`,
+    ahead: (m) => `${m} min de adelanto`,
+    left: (m) => `quedan ${m} min`,
+    motionOnFloor: 'Moción en el pleno',
+    moved: 'Propuesta por',
+    seconded: 'Secundada por',
+    votesCast: 'Votos emitidos',
+    needed: 'Necesarios para aprobar',
+    carried: 'APROBADA',
+    defeated: 'RECHAZADA',
+    yes: 'Sí',
+    no: 'No',
+    abstain: 'Abstención',
+    quorumNotMet: 'No hay quórum',
+    substantialUnanimity: 'Unanimidad sustancial: dos tercios de los miembros que votan',
+    minorityInvited: (side) => `Se invita a la minoría a expresarse: ${side}`,
+    forSide: 'los que votaron a favor',
+    againstSide: 'los que votaron en contra',
+    speakers: 'Intervenciones',
+    conferenceItem: 'Punto del orden del día de la Conferencia',
+    committee: 'Comité',
+    choices: 'Se pregunta a la asamblea',
+    senseLabel: 'Sentir de la asamblea',
+    notPolled: 'Discusión: aún no se ha votado',
+    senseUnanimity: (label, pct) => `${label}: unanimidad sustancial (${pct}%)`,
+    senseMajority: (label, pct) => `${label}: solo mayoría simple (${pct}%)`,
+    sensePlurality: (label, pct) => `${label} encabeza con el ${pct}%`,
+    senseTied: 'No hay un sentir claro: las opciones principales están empatadas',
+    totalVoteShort: 'Voto total',
+  },
   ballot: (n) => `${ordinalL(n, 'es')} votación`,
   finalBallot: 'final',
   confirmationBallot: 'votación de confirmación',
@@ -312,6 +424,43 @@ const ES: Dict = {
 };
 
 const FR: Dict = {
+  screens: {
+    agendaTitle: 'Ordre du jour',
+    now: 'En cours',
+    upNext: 'Ensuite',
+    planned: 'prévu',
+    actual: 'écoulé',
+    onTime: 'à l’heure',
+    behind: (m) => `${m} min de retard`,
+    ahead: (m) => `${m} min d’avance`,
+    left: (m) => `${m} min restantes`,
+    motionOnFloor: 'Proposition en délibération',
+    moved: 'Proposée par',
+    seconded: 'Appuyée par',
+    votesCast: 'Votes exprimés',
+    needed: 'Requis pour adopter',
+    carried: 'ADOPTÉE',
+    defeated: 'REJETÉE',
+    yes: 'Oui',
+    no: 'Non',
+    abstain: 'Abstention',
+    quorumNotMet: 'Quorum non atteint',
+    substantialUnanimity: 'Unanimité substantielle : les deux tiers des membres votants',
+    minorityInvited: (side) => `La minorité est invitée à s’exprimer — ${side}`,
+    forSide: 'ceux qui étaient pour',
+    againstSide: 'ceux qui étaient contre',
+    speakers: 'Intervenants',
+    conferenceItem: 'Point à l’ordre du jour de la Conférence',
+    committee: 'Comité',
+    choices: 'L’assemblée est consultée',
+    senseLabel: 'Sentiment de l’assemblée',
+    notPolled: 'Discussion — aucun vote encore',
+    senseUnanimity: (label, pct) => `${label} — unanimité substantielle (${pct} %)`,
+    senseMajority: (label, pct) => `${label} — majorité simple seulement (${pct} %)`,
+    sensePlurality: (label, pct) => `${label} arrive en tête avec ${pct} %`,
+    senseTied: 'Aucun sentiment clair — les principaux choix sont à égalité',
+    totalVoteShort: 'Vote total',
+  },
   ballot: (n) => `${ordinalL(n, 'fr')} tour de scrutin`,
   finalBallot: 'dernier',
   confirmationBallot: 'scrutin de confirmation',

@@ -5,6 +5,9 @@ import { nanoid } from 'nanoid';
 import {
   AGAINST,
   CHANNELS,
+  DEFAULT_BADGE_DESIGN,
+  DEFAULT_CONFERENCE_OPTIONS,
+  DEFAULT_MOTION_SETTINGS,
   DEFAULT_SETTINGS,
   type Assembly,
   type Channel,
@@ -19,12 +22,25 @@ import {
   type Officials,
   type Position,
   type Settings,
+  type AgendaItem,
+  type AttendanceOption,
+  type BadgeDesign,
+  type ConferenceItem,
+  type ConferenceRound,
+  type ConferenceSettings,
+  type Motion,
+  type MotionKind,
+  type MotionRound,
+  type MotionSettings,
   type TellerReport,
   type Voter,
+  type VoterField,
   type VoterRole,
+  type VoteThreshold,
 } from './engine/types';
 import { computePosition, ordinal } from './engine/thirdLegacy';
 import { computeEligibility } from './engine/voters';
+import { MOTION_RULES, tallyMotion } from './engine/business';
 import { secureShuffle } from './engine/random';
 import { DEFAULT_BALLOT_COLORS, PRESETS } from './presets';
 
@@ -136,6 +152,24 @@ export function newAssembly(name: string, type: ElectionType = 'area'): Assembly
     approvals: { procedure: null, order: null, whoVotes: null },
     settings: { ...DEFAULT_SETTINGS },
     positions: [],
+    motions: [],
+    motionSettings: { ...DEFAULT_MOTION_SETTINGS, quorum: { kind: 'none' } },
+    conferenceItems: [],
+    conferenceSettings: {
+      session: '',
+      defaultOptions: structuredClone(DEFAULT_CONFERENCE_OPTIONS),
+      guidanceNote:
+        'The sense of the assembly guides the delegate, who carries the area’s group conscience to the Conference and votes there with an informed conscience.',
+    },
+    agenda: [],
+    agendaStart: '09:00',
+    badge: structuredClone(DEFAULT_BADGE_DESIGN),
+    attendanceOptions: [
+      { id: 'assembly', label: 'Assembly', showOnBadge: true },
+      { id: 'convention', label: 'Convention', showOnBadge: true },
+      { id: 'banquet', label: 'Banquet', showOnBadge: true },
+    ],
+    voterFields: [],
     livePositionId: null,
     live: idleLive(),
     displayBreakdown: true,
@@ -167,6 +201,17 @@ export function normalizeAssembly(raw: unknown): Assembly {
     // A file opened later must not put the projector back into "voting open" with a stale timer.
     live: { ...idleLive(), message: a.live?.message ?? '' },
     ballotColors: Array.isArray(a.ballotColors) ? a.ballotColors : base.ballotColors,
+    motions: Array.isArray(a.motions) ? a.motions : [],
+    motionSettings: { ...DEFAULT_MOTION_SETTINGS, ...(a.motionSettings ?? {}) },
+    conferenceItems: Array.isArray(a.conferenceItems) ? a.conferenceItems : [],
+    conferenceSettings: { ...base.conferenceSettings, ...(a.conferenceSettings ?? {}) },
+    agenda: Array.isArray(a.agenda) ? a.agenda : [],
+    agendaStart: a.agendaStart ?? base.agendaStart,
+    badge: { ...structuredClone(DEFAULT_BADGE_DESIGN), ...(a.badge ?? {}),
+      front: { ...DEFAULT_BADGE_DESIGN.front, ...(a.badge?.front ?? {}) },
+      back: { ...DEFAULT_BADGE_DESIGN.back, ...(a.badge?.back ?? {}) } },
+    attendanceOptions: Array.isArray(a.attendanceOptions) ? a.attendanceOptions : base.attendanceOptions,
+    voterFields: Array.isArray(a.voterFields) ? a.voterFields : [],
     language: a.language ?? 'en',
     settings: { ...DEFAULT_SETTINGS, ...(a.settings ?? {}) },
     log: Array.isArray(a.log) ? a.log : [],
@@ -270,6 +315,46 @@ interface Actions {
 
   resetPosition: (aid: string, pid: string) => void;
   addLog: (aid: string, entry: Omit<LogEntry, 'at'>) => void;
+
+  // ---- motions
+  updateMotionSettings: (aid: string, patch: Partial<MotionSettings>) => void;
+  addMotion: (aid: string, motion: Partial<Motion>) => string;
+  updateMotion: (aid: string, mid: string, patch: Partial<Pick<Motion, 'title' | 'text' | 'background' | 'movedBy' | 'secondedBy' | 'committee' | 'threshold' | 'kind' | 'notes'>>) => void;
+  removeMotion: (aid: string, mid: string) => void;
+  setMotionStatus: (aid: string, mid: string, status: Motion['status'], note?: string) => void;
+  addSpeaker: (aid: string, mid: string, side: 'for' | 'against', delta: number) => void;
+  recordMotionVote: (aid: string, mid: string, round: Omit<MotionRound, 'id' | 'at' | 'carried' | 'quorumMet' | 'eligible'>) => void;
+  undoMotionVote: (aid: string, mid: string) => void;
+  recordMinorityOpinion: (aid: string, mid: string, roundId: string, notes: string, heard: boolean) => void;
+
+  // ---- Conference agenda items
+  updateConferenceSettings: (aid: string, patch: Partial<ConferenceSettings>) => void;
+  addConferenceItem: (aid: string, item: Partial<ConferenceItem>) => string;
+  updateConferenceItem: (aid: string, cid: string, patch: Partial<Omit<ConferenceItem, 'id' | 'rounds' | 'createdAt'>>) => void;
+  removeConferenceItem: (aid: string, cid: string) => void;
+  recordConferencePoll: (aid: string, cid: string, round: Omit<ConferenceRound, 'id' | 'at'>) => void;
+  undoConferencePoll: (aid: string, cid: string) => void;
+  importConferenceItems: (aid: string, items: Partial<ConferenceItem>[]) => number;
+
+  // ---- agenda
+  setAgendaStart: (aid: string, time: string) => void;
+  addAgendaItem: (aid: string, item: Partial<AgendaItem>, afterId?: string) => string;
+  updateAgendaItem: (aid: string, iid: string, patch: Partial<AgendaItem>) => void;
+  removeAgendaItem: (aid: string, iid: string) => void;
+  moveAgendaItem: (aid: string, iid: string, delta: number) => void;
+  startAgendaItem: (aid: string, iid: string) => void;
+  finishAgendaItem: (aid: string, iid: string) => void;
+  loadAgendaTemplate: (aid: string, template: AgendaItem[]) => void;
+
+  // ---- projector, badges and registration
+  setScreen: (aid: string, screen: NonNullable<Live['screen']>, id?: string | null) => void;
+  setZoom: (aid: string, zoom: number) => void;
+  setHighContrast: (aid: string, on: boolean) => void;
+  updateBadge: (aid: string, patch: Partial<BadgeDesign>) => void;
+  setAttendanceOptions: (aid: string, options: AttendanceOption[]) => void;
+  setVoterFields: (aid: string, fields: VoterField[]) => void;
+  setVoterAttending: (aid: string, vid: string, optionId: string, on: boolean) => void;
+  setVoterCustom: (aid: string, vid: string, fieldId: string, value: string) => void;
 }
 
 export type Store = State & Actions;
@@ -872,6 +957,353 @@ export const useStore = create<Store>()(
           }),
 
         addLog: (aid, entry) => mutate(aid, (a) => void a.log.push({ ...entry, at: now() })),
+
+        /* ---------------- motions ---------------- */
+
+        updateMotionSettings: (aid, patch) =>
+          mutate(aid, (a) => {
+            Object.assign(a.motionSettings, patch);
+            log(a, 'Motion settings changed', Object.entries(patch).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join(', '));
+          }),
+
+        addMotion: (aid, motion) => {
+          const id = nanoid(10);
+          mutate(aid, (a) => {
+            const kind = (motion.kind ?? 'main') as MotionKind;
+            const number = a.motions.length + 1;
+            a.motions.push({
+              id,
+              number,
+              kind,
+              title: motion.title?.trim() || `Motion ${number}`,
+              text: motion.text?.trim() ?? '',
+              background: motion.background ?? '',
+              movedBy: motion.movedBy ?? '',
+              secondedBy: motion.secondedBy ?? (MOTION_RULES[kind].second === 'automatic' ? 'Committee recommendation (automatically seconded)' : ''),
+              committee: motion.committee,
+              threshold: motion.threshold ?? (MOTION_RULES[kind].threshold as VoteThreshold),
+              status: 'open',
+              rounds: [],
+              speakers: { for: 0, against: 0 },
+              notes: '',
+              reconsidered: false,
+              createdAt: now(),
+            });
+            log(a, 'Motion introduced', `${number}. ${motion.title?.trim() || motion.text?.slice(0, 60) || ''}`);
+          });
+          return id;
+        },
+
+        updateMotion: (aid, mid, patch) =>
+          mutate(aid, (a) => {
+            const m = a.motions.find((x) => x.id === mid);
+            if (!m) return;
+            if (patch.kind && patch.kind !== m.kind) m.threshold = MOTION_RULES[patch.kind].threshold as VoteThreshold;
+            Object.assign(m, patch);
+          }),
+
+        removeMotion: (aid, mid) =>
+          mutate(aid, (a) => {
+            const m = a.motions.find((x) => x.id === mid);
+            if (!m) return;
+            if (m.rounds.length) throw new ActionError('This motion has recorded votes — undo them first.');
+            a.motions = a.motions.filter((x) => x.id !== mid);
+            a.motions.forEach((x, i) => (x.number = i + 1));
+            log(a, 'Motion removed', m.title);
+          }),
+
+        setMotionStatus: (aid, mid, status, note) =>
+          mutate(aid, (a) => {
+            const m = a.motions.find((x) => x.id === mid);
+            if (!m) return;
+            m.status = status;
+            if (status !== 'open') m.decidedAt = now();
+            if (note) m.notes = [m.notes, note].filter(Boolean).join('\n');
+            log(a, `Motion ${status}`, `${m.number}. ${m.title}${note ? ` — ${note}` : ''}`);
+          }),
+
+        addSpeaker: (aid, mid, side, delta) =>
+          mutate(aid, (a) => {
+            const m = a.motions.find((x) => x.id === mid);
+            if (!m) return;
+            m.speakers[side] = Math.max(0, m.speakers[side] + delta);
+          }),
+
+        recordMotionVote: (aid, mid, round) =>
+          mutate(aid, (a) => {
+            const m = a.motions.find((x) => x.id === mid);
+            if (!m) throw new ActionError('That motion is no longer here.');
+            if (round.kind === 'reconsider' && m.reconsidered) {
+              throw new ActionError('This action has already been reconsidered once — it may not be reconsidered twice.');
+            }
+            const eligibleCounts = effectiveVoters(a);
+            const eligible = eligibleCounts.inPerson + eligibleCounts.virtual;
+            const tally = tallyMotion(round.counts, round.threshold, a.motionSettings, eligible);
+            const entry: MotionRound = {
+              ...round,
+              id: nanoid(8),
+              at: now(),
+              eligible,
+              carried: tally.carried,
+              quorumMet: tally.quorumMet,
+              minority: MOTION_RULES[round.kind].minorityHeard ? { heard: false, side: tally.minoritySide, notes: '' } : undefined,
+            };
+            m.rounds.push(entry);
+
+            // What the result does to the motion itself.
+            if (round.kind === 'main' || round.kind === 'committee' || round.kind === 'floor') {
+              m.status = tally.carried ? 'carried' : 'defeated';
+              m.decidedAt = now();
+            } else if (round.kind === 'table' && tally.carried) {
+              m.status = 'tabled';
+            } else if (round.kind === 'recommit' && tally.carried) {
+              m.status = 'recommitted';
+              m.decidedAt = now();
+            } else if (round.kind === 'reconsider' && tally.carried) {
+              // Debate resumes and the question is open again.
+              m.reconsidered = true;
+              m.status = 'open';
+              m.decidedAt = undefined;
+            } else if (round.kind === 'amend' && tally.carried && round.text) {
+              m.text = round.text;
+            }
+            log(
+              a,
+              `${MOTION_RULES[round.kind].label} ${tally.carried ? 'CARRIED' : 'DEFEATED'}`,
+              `${m.number}. ${m.title} — yes ${tally.yes}, no ${tally.no}, abstain ${tally.abstain} (needed ${tally.needed} of ${tally.votesCast})${
+                tally.quorumMet ? '' : '; quorum not met'
+              }`,
+            );
+          }),
+
+        undoMotionVote: (aid, mid) =>
+          mutate(aid, (a) => {
+            const m = a.motions.find((x) => x.id === mid);
+            if (!m || !m.rounds.length) throw new ActionError('No vote has been recorded on this motion.');
+            const removed = m.rounds.pop()!;
+            if (removed.kind === 'reconsider' && removed.carried) m.reconsidered = false;
+            // Recompute the motion's standing from whatever votes remain.
+            const decisive = [...m.rounds].reverse().find((r) => r.kind === 'main' || r.kind === 'committee' || r.kind === 'floor');
+            const tabled = [...m.rounds].reverse().find((r) => r.kind === 'table' && r.carried);
+            m.status = tabled ? 'tabled' : decisive ? (decisive.carried ? 'carried' : 'defeated') : 'open';
+            m.decidedAt = decisive ? decisive.at : undefined;
+            log(a, 'Motion vote undone', `${m.number}. ${m.title} — ${MOTION_RULES[removed.kind].label}`);
+          }),
+
+        recordMinorityOpinion: (aid, mid, roundId, notes, heard) =>
+          mutate(aid, (a) => {
+            const m = a.motions.find((x) => x.id === mid);
+            const r = m?.rounds.find((x) => x.id === roundId);
+            if (!m || !r || !r.minority) return;
+            r.minority = { ...r.minority, heard, notes };
+            log(
+              a,
+              heard ? 'Minority opinion heard' : 'Minority opinion noted',
+              `${m.number}. ${m.title} — the ${r.minority.side === 'for' ? 'side in favour' : 'side against'} spoke${notes ? `: ${notes}` : ''}`,
+            );
+          }),
+
+        /* ---------------- Conference agenda items ---------------- */
+
+        updateConferenceSettings: (aid, patch) => mutate(aid, (a) => void Object.assign(a.conferenceSettings, patch)),
+
+        addConferenceItem: (aid, item) => {
+          const id = nanoid(10);
+          mutate(aid, (a) => {
+            a.conferenceItems.push({
+              id,
+              committee: item.committee ?? '',
+              reference: item.reference ?? '',
+              title: item.title?.trim() || 'Agenda item',
+              background: item.background ?? '',
+              links: item.links ?? [],
+              options: item.options ?? a.conferenceSettings.defaultOptions.map((o) => ({ ...o })),
+              rounds: [],
+              notes: item.notes ?? '',
+              delegateNote: item.delegateNote ?? '',
+              presenter: item.presenter,
+              status: 'toDiscuss',
+              createdAt: now(),
+            });
+            log(a, 'Conference agenda item added', `${item.committee ? `${item.committee}: ` : ''}${item.title ?? ''}`);
+          });
+          return id;
+        },
+
+        updateConferenceItem: (aid, cid, patch) =>
+          mutate(aid, (a) => {
+            const c = a.conferenceItems.find((x) => x.id === cid);
+            if (c) Object.assign(c, patch);
+          }),
+
+        removeConferenceItem: (aid, cid) =>
+          mutate(aid, (a) => {
+            const c = a.conferenceItems.find((x) => x.id === cid);
+            if (!c) return;
+            if (c.rounds.length) throw new ActionError('This item has a recorded poll — undo it first.');
+            a.conferenceItems = a.conferenceItems.filter((x) => x.id !== cid);
+            log(a, 'Conference agenda item removed', c.title);
+          }),
+
+        recordConferencePoll: (aid, cid, round) =>
+          mutate(aid, (a) => {
+            const c = a.conferenceItems.find((x) => x.id === cid);
+            if (!c) throw new ActionError('That item is no longer here.');
+            c.rounds.push({ ...round, id: nanoid(8), at: now() });
+            c.status = 'polled';
+            const totals = c.options
+              .map((o) => `${o.label} ${(round.counts.inPerson?.[o.id] ?? 0) + (round.counts.virtual?.[o.id] ?? 0)}`)
+              .join(', ');
+            log(a, 'Conference item polled', `${c.reference || c.title}: ${totals}; abstain ${(round.abstain.inPerson ?? 0) + (round.abstain.virtual ?? 0)}`);
+          }),
+
+        undoConferencePoll: (aid, cid) =>
+          mutate(aid, (a) => {
+            const c = a.conferenceItems.find((x) => x.id === cid);
+            if (!c || !c.rounds.length) throw new ActionError('No poll has been recorded for this item.');
+            c.rounds.pop();
+            if (!c.rounds.length) c.status = 'discussed';
+            log(a, 'Conference item poll undone', c.reference || c.title);
+          }),
+
+        importConferenceItems: (aid, items) => {
+          let added = 0;
+          mutate(aid, (a) => {
+            for (const item of items) {
+              if (!item.title) continue;
+              a.conferenceItems.push({
+                id: nanoid(10),
+                committee: item.committee ?? '',
+                reference: item.reference ?? '',
+                title: item.title,
+                background: item.background ?? '',
+                links: item.links ?? [],
+                options: a.conferenceSettings.defaultOptions.map((o) => ({ ...o })),
+                rounds: [],
+                notes: '',
+                delegateNote: '',
+                status: 'toDiscuss',
+                createdAt: now(),
+              });
+              added++;
+            }
+            if (added) log(a, 'Conference agenda items imported', `${added} item(s)`);
+          });
+          return added;
+        },
+
+        /* ---------------- agenda ---------------- */
+
+        setAgendaStart: (aid, time) => mutate(aid, (a) => void (a.agendaStart = time)),
+
+        addAgendaItem: (aid, item, afterId) => {
+          const id = nanoid(10);
+          mutate(aid, (a) => {
+            const entry: AgendaItem = {
+              id,
+              title: item.title?.trim() || 'Agenda item',
+              kind: item.kind ?? 'segment',
+              plannedMinutes: item.plannedMinutes ?? 15,
+              presenter: item.presenter ?? '',
+              notes: item.notes ?? '',
+              linkId: item.linkId,
+              startedAt: null,
+              endedAt: null,
+            };
+            const i = afterId ? a.agenda.findIndex((x) => x.id === afterId) : -1;
+            if (i >= 0) a.agenda.splice(i + 1, 0, entry);
+            else a.agenda.push(entry);
+          });
+          return id;
+        },
+
+        updateAgendaItem: (aid, iid, patch) =>
+          mutate(aid, (a) => {
+            const i = a.agenda.find((x) => x.id === iid);
+            if (i) Object.assign(i, patch);
+          }),
+
+        removeAgendaItem: (aid, iid) =>
+          mutate(aid, (a) => {
+            a.agenda = a.agenda.filter((x) => x.id !== iid);
+            if (a.live.agendaItemId === iid) a.live.agendaItemId = null;
+          }),
+
+        moveAgendaItem: (aid, iid, delta) =>
+          mutate(aid, (a) => {
+            const i = a.agenda.findIndex((x) => x.id === iid);
+            const j = i + delta;
+            if (i < 0 || j < 0 || j >= a.agenda.length) return;
+            const [item] = a.agenda.splice(i, 1);
+            a.agenda.splice(j, 0, item);
+          }),
+
+        startAgendaItem: (aid, iid) =>
+          mutate(aid, (a) => {
+            const item = a.agenda.find((x) => x.id === iid);
+            if (!item) return;
+            // Close whatever was running.
+            for (const other of a.agenda) if (other.id !== iid && other.startedAt && !other.endedAt) other.endedAt = now();
+            item.startedAt = item.startedAt ?? now();
+            item.endedAt = null;
+            a.live = { ...a.live, agendaItemId: iid, screen: 'agenda' };
+            log(a, 'Agenda item started', item.title);
+          }),
+
+        finishAgendaItem: (aid, iid) =>
+          mutate(aid, (a) => {
+            const item = a.agenda.find((x) => x.id === iid);
+            if (!item || !item.startedAt) return;
+            item.endedAt = now();
+            log(a, 'Agenda item finished', item.title);
+          }),
+
+        loadAgendaTemplate: (aid, template) =>
+          mutate(aid, (a) => {
+            a.agenda = template.map((t) => ({ ...t, id: nanoid(10), startedAt: null, endedAt: null }));
+            log(a, 'Agenda loaded from a template', `${template.length} items`);
+          }),
+
+        /* ---------------- projector, badges, registration ---------------- */
+
+        setScreen: (aid, screen, id) =>
+          mutate(aid, (a) => {
+            a.live = {
+              ...a.live,
+              screen,
+              agendaItemId: screen === 'agenda' ? (id ?? a.live.agendaItemId ?? null) : a.live.agendaItemId,
+              motionId: screen === 'motion' ? (id ?? null) : a.live.motionId,
+              conferenceItemId: screen === 'conference' ? (id ?? null) : a.live.conferenceItemId,
+            };
+          }),
+
+        setZoom: (aid, zoom) => mutate(aid, (a) => void (a.live.zoom = Math.min(2, Math.max(0.5, Math.round(zoom * 100) / 100)))),
+        setHighContrast: (aid, on) => mutate(aid, (a) => void (a.live.highContrast = on)),
+
+        updateBadge: (aid, patch) =>
+          mutate(aid, (a) => {
+            a.badge = { ...a.badge, ...patch, front: { ...a.badge.front, ...(patch.front ?? {}) }, back: { ...a.badge.back, ...(patch.back ?? {}) } };
+          }),
+
+        setAttendanceOptions: (aid, options) => mutate(aid, (a) => void (a.attendanceOptions = options)),
+        setVoterFields: (aid, fields) => mutate(aid, (a) => void (a.voterFields = fields)),
+
+        setVoterAttending: (aid, vid, optionId, on) =>
+          mutate(aid, (a) => {
+            const v = a.voterRoll.find((x) => x.id === vid);
+            if (!v) return;
+            const current = new Set(v.attending ?? []);
+            if (on) current.add(optionId);
+            else current.delete(optionId);
+            v.attending = [...current];
+          }),
+
+        setVoterCustom: (aid, vid, fieldId, value) =>
+          mutate(aid, (a) => {
+            const v = a.voterRoll.find((x) => x.id === vid);
+            if (!v) return;
+            v.custom = { ...(v.custom ?? {}), [fieldId]: value };
+          }),
       };
     }),
     {

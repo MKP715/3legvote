@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router';
 import Papa from 'papaparse';
 import { nanoid } from 'nanoid';
 import { useAssembly, useStore } from '../store';
-import { CHANNEL_LABEL, CHANNELS, type Channel, type VoterRole } from '../engine/types';
+import { CHANNEL_LABEL, CHANNELS, type Assembly, type Channel, type Voter, type VoterRole } from '../engine/types';
 import { computeEligibility, regionalTrusteeBalance, rollFromRows, type RollImport } from '../engine/voters';
 import { PRESETS } from '../presets';
 import { ROLL_COLUMN_HELP, saveCsv, voterRollTemplate } from '../templates';
@@ -31,6 +31,8 @@ export function VotersPage() {
   const exclusion = new Map(el.excluded.map((x) => [x.voter.id, x.reason]));
   const bal = a.electionType === 'regionalTrustee' ? regionalTrusteeBalance(el.eligible, a.roles) : null;
   const roleId = form.roleId || a.roles.find((r) => r.votes)?.id || a.roles[0]?.id || '';
+
+  const showRegistration = a.attendanceOptions.length > 0 || a.voterFields.length > 0;
 
   const shown = a.voterRoll.filter((v) => {
     if (q && !`${v.name} ${v.group} ${v.district} ${roleName.get(v.roleId) ?? ''}`.toLowerCase().includes(q.toLowerCase())) return false;
@@ -202,6 +204,8 @@ export function VotersPage() {
           </div>
         </header>
 
+        <RegistrationOptions assembly={a} />
+
         <details className="panel-lite">
           <summary>How to prepare the file before you import</summary>
           <p className="muted small">
@@ -307,6 +311,7 @@ export function VotersPage() {
                   <th>Role</th>
                   <th>Group / district</th>
                   <th>Attending</th>
+                  {showRegistration && <th>Signed up for</th>}
                   <th>Vote</th>
                   <th />
                 </tr>
@@ -347,6 +352,11 @@ export function VotersPage() {
                         {v.channel === 'inPerson' ? '🏛 In-person' : '💻 Virtual'}
                       </button>
                     </td>
+                    {showRegistration && (
+                      <td>
+                        <RegistrationCell assembly={a} voter={v} />
+                      </td>
+                    )}
                     <td>
                       {eligibleIds.has(v.id) ? (
                         <Badge kind="ok">votes</Badge>
@@ -489,5 +499,200 @@ export function VotersPage() {
         </button>
       </article>
     </>
+  );
+}
+
+
+/**
+ * What people register for (the assembly itself, a convention, a banquet...) and any extra
+ * detail the registrar collects. Both are saved with the assembly and can be printed on the
+ * name badges.
+ */
+function RegistrationOptions({ assembly }: { assembly: Assembly }) {
+  const s = useStore();
+  const a = assembly;
+  const [option, setOption] = useState('');
+  const [field, setField] = useState('');
+  return (
+    <details className="panel-lite">
+      <summary>
+        Registration options &amp; extra details ({a.attendanceOptions.length} option(s), {a.voterFields.length} field(s))
+      </summary>
+      <p className="muted small">
+        Tick these for each person as they register. They show on the roll, on the name badges and in the attendance section of the report.
+      </p>
+      <div className="grid-2">
+        <div>
+          <strong className="small">Registration options</strong>
+          <ul className="chip-list">
+            {a.attendanceOptions.map((o) => (
+              <li key={o.id} className="chip">
+                <input
+                  type="text"
+                  defaultValue={o.label}
+                  key={o.label}
+                  aria-label={`Option ${o.label}`}
+                  onBlur={(e) => {
+                    const label = e.target.value.trim();
+                    if (label && label !== o.label)
+                      s.setAttendanceOptions(
+                        a.id,
+                        a.attendanceOptions.map((x) => (x.id === o.id ? { ...x, label } : x)),
+                      );
+                  }}
+                />
+                <label className="inline-field" title="Print this on the badge">
+                  <input
+                    type="checkbox"
+                    checked={o.showOnBadge}
+                    onChange={(e) =>
+                      s.setAttendanceOptions(
+                        a.id,
+                        a.attendanceOptions.map((x) => (x.id === o.id ? { ...x, showOnBadge: e.target.checked } : x)),
+                      )
+                    }
+                  />
+                  badge
+                </label>
+                <button
+                  className="outline danger mini"
+                  aria-label={`Remove ${o.label}`}
+                  onClick={() =>
+                    s.setAttendanceOptions(
+                      a.id,
+                      a.attendanceOptions.filter((x) => x.id !== o.id),
+                    )
+                  }
+                >
+                  X
+                </button>
+              </li>
+            ))}
+          </ul>
+          <form
+            className="row wrap"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const label = option.trim();
+              if (!label) return;
+              s.setAttendanceOptions(a.id, [...a.attendanceOptions, { id: nanoid(6), label, showOnBadge: true }]);
+              setOption('');
+            }}
+          >
+            <input
+              type="text"
+              value={option}
+              onChange={(e) => setOption(e.target.value)}
+              placeholder="e.g. Banquet"
+              aria-label="New registration option"
+            />
+            <button type="submit" className="outline" disabled={!option.trim()}>
+              Add
+            </button>
+          </form>
+        </div>
+        <div>
+          <strong className="small">Extra details collected at registration</strong>
+          <ul className="chip-list">
+            {a.voterFields.map((f) => (
+              <li key={f.id} className="chip">
+                <input
+                  type="text"
+                  defaultValue={f.label}
+                  key={f.label}
+                  aria-label={`Field ${f.label}`}
+                  onBlur={(e) => {
+                    const label = e.target.value.trim();
+                    if (label && label !== f.label)
+                      s.setVoterFields(
+                        a.id,
+                        a.voterFields.map((x) => (x.id === f.id ? { ...x, label } : x)),
+                      );
+                  }}
+                />
+                <label className="inline-field" title="Print this on the badge">
+                  <input
+                    type="checkbox"
+                    checked={f.showOnBadge}
+                    onChange={(e) =>
+                      s.setVoterFields(
+                        a.id,
+                        a.voterFields.map((x) => (x.id === f.id ? { ...x, showOnBadge: e.target.checked } : x)),
+                      )
+                    }
+                  />
+                  badge
+                </label>
+                <button
+                  className="outline danger mini"
+                  aria-label={`Remove ${f.label}`}
+                  onClick={() =>
+                    s.setVoterFields(
+                      a.id,
+                      a.voterFields.filter((x) => x.id !== f.id),
+                    )
+                  }
+                >
+                  X
+                </button>
+              </li>
+            ))}
+          </ul>
+          <form
+            className="row wrap"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const label = field.trim();
+              if (!label) return;
+              s.setVoterFields(a.id, [...a.voterFields, { id: nanoid(6), label, showOnBadge: false }]);
+              setField('');
+            }}
+          >
+            <input
+              type="text"
+              value={field}
+              onChange={(e) => setField(e.target.value)}
+              placeholder="e.g. Dietary needs"
+              aria-label="New registration field"
+            />
+            <button type="submit" className="outline" disabled={!field.trim()}>
+              Add
+            </button>
+          </form>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+/** One person's registration: what they are signed up for, and any extra detail. */
+function RegistrationCell({ assembly, voter }: { assembly: Assembly; voter: Voter }) {
+  const s = useStore();
+  const a = assembly;
+  const on = new Set(voter.attending ?? []);
+  return (
+    <div className="reg-cell">
+      {a.attendanceOptions.map((o) => (
+        <button
+          key={o.id}
+          className={`chip-toggle ${on.has(o.id) ? 'on' : ''}`}
+          aria-pressed={on.has(o.id)}
+          onClick={() => s.setVoterAttending(a.id, voter.id, o.id, !on.has(o.id))}
+        >
+          {o.label}
+        </button>
+      ))}
+      {a.voterFields.map((f) => (
+        <input
+          key={f.id}
+          type="text"
+          className="reg-field"
+          placeholder={f.label}
+          aria-label={`${f.label} for ${voter.name}`}
+          defaultValue={voter.custom?.[f.id] ?? ''}
+          onBlur={(e) => s.setVoterCustom(a.id, voter.id, f.id, e.target.value)}
+        />
+      ))}
+    </div>
   );
 }

@@ -301,6 +301,75 @@ export function Guide() {
         </li>
       </ul>
 
+      <h2>Business: motions and substantial unanimity</h2>
+      <p>
+        Elections are only part of an assembly. The <strong>Motions</strong> page runs the rest of the business the way the Conference does it
+        (Appendix W). A matter of policy carries on <strong>substantial unanimity</strong> — “a two-thirds majority … of the members voting, as long as
+        the total vote constitutes a quorum”. Routine matters carry on a <strong>simple majority</strong>, “one-half of votes cast plus one”.
+      </p>
+      <ul>
+        <li>
+          <strong>What the app does.</strong> You enter the yes / no / abstain counts for the room and for those online; it adds them, shows how many
+          votes are needed before you record anything, checks the quorum, and writes the result into the minutes and the audit log.
+        </li>
+        <li>
+          <strong>Abstentions.</strong> By default an abstention is not a vote cast, so it does not raise the number needed. Areas that count them can
+          switch that on.
+        </li>
+        <li>
+          <strong>The minority is always heard.</strong> After each vote on policy the app names the side that did not prevail and invites it to speak.
+          A well-reasoned minority opinion can lead the body to vote again.
+        </li>
+        <li>
+          <strong>Motions on the motion.</strong> Amend, table, recommit, call the question, decline to consider and reconsider are all offered, each
+          with the second, debatability and vote the Service Manual gives it. A committee recommendation needs no second; an action may be reconsidered
+          only once, and only on the motion of someone who voted with the prevailing side.
+        </li>
+        <li>
+          <strong>Debate.</strong> Count the speakers for and against, and start the two-minute speaker timer — it shows on the projector.
+        </li>
+      </ul>
+
+      <h2>Conference agenda items</h2>
+      <p>
+        Before the General Service Conference the delegate brings the agenda to the area. The <strong>Conference items</strong> page holds each item
+        with its committee, background and links (printed as QR codes so the room can read the material on their phones), the notes taken while it is
+        discussed, and a poll of the assembly — in the room and online — on whatever choices you set.
+      </p>
+      <p>
+        The result is reported as the <strong>sense of the assembly</strong>, and says plainly whether a choice reached substantial unanimity or only a
+        simple majority. It is guidance, not instruction: the delegate carries the area’s conscience to the Conference and votes there with an informed
+        conscience after hearing all the sharing. Each item also has a note for the delegate, and the whole set exports as a CSV delegate report.
+      </p>
+
+      <h2>The agenda and the projector</h2>
+      <p>
+        The <strong>Agenda</strong> page runs the day. Load one of the sample formats from Appendix D (election assembly, regular assembly or a
+        pre-Conference assembly) or build your own, set the start time, and the app lays out the clock times. Start an item and it tracks the minutes
+        actually used against the minutes planned, so the chair can see at a glance whether the day is running over.
+      </p>
+      <p>
+        The projector window follows whatever you put up: the election, the agenda (with what is happening now and what is next), a motion with its
+        running tally, or a Conference item. Size it for the room with the + and − buttons (or the same keys in the projector window itself), and turn
+        on the <strong>high-contrast theme</strong> for a washed-out screen or a bright hall.
+      </p>
+
+      <h2>Registration and name badges</h2>
+      <p>
+        Registration can collect more than a name: add options such as <em>assembly</em>, <em>convention</em> or <em>banquet</em>, and any extra detail
+        your registrar needs. The <strong>Name badges</strong> page prints them — 4, 6 or 8 to a sheet, single- or double-sided, with your own heading,
+        colour and logo, the member’s service position, group and district, what they are signed up for, and their check-in QR code so the desk scans
+        the badge people are already wearing. The back can carry your own text, the day’s agenda, and any links you give as QR codes. The design is
+        saved with the assembly, so the same badges reprint all weekend.
+      </p>
+
+      <h2>The report in your language</h2>
+      <p>
+        The printed record can be produced in English, Spanish or French — headings, table columns and the standing notes, not just the chair’s
+        announcements. It covers the elections ballot by ballot, the motions and how each was decided, the Conference items with the sense of the
+        assembly, the agenda as it actually ran, who was present and who had a vote, the full audit log, and a page for signatures.
+      </p>
+
       <h2>Your data</h2>
       <p>
         This app runs entirely in your browser and keeps working offline once loaded. Elections are saved on this device only — nothing is uploaded.

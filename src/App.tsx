@@ -9,6 +9,10 @@ import { PrintBallots } from './pages/PrintBallots';
 import { Guide } from './pages/Guide';
 import { VotersPage } from './pages/VotersPage';
 import { CheckinPage } from './pages/CheckinPage';
+import { AgendaPage } from './pages/AgendaPage';
+import { MotionsPage } from './pages/MotionsPage';
+import { ConferencePage } from './pages/ConferencePage';
+import { BadgesPage } from './pages/BadgesPage';
 import { TellerPage } from './pages/TellerPage';
 import { NotFound } from './pages/NotFound';
 import { ConfirmHost, ErrorBoundary, notify, ToastHost } from './components/ui';
@@ -135,6 +139,10 @@ function Shell() {
           <Route path="/a/:aid/p/:pid" element={<PositionPage />} />
           <Route path="/a/:aid/voters" element={<VotersPage />} />
           <Route path="/a/:aid/checkin" element={<CheckinPage />} />
+          <Route path="/a/:aid/agenda" element={<AgendaPage />} />
+          <Route path="/a/:aid/motions" element={<MotionsPage />} />
+          <Route path="/a/:aid/conference" element={<ConferencePage />} />
+          <Route path="/a/:aid/badges" element={<BadgesPage />} />
           <Route path="/a/:aid/report" element={<Report />} />
           <Route path="/a/:aid/ballots" element={<PrintBallots />} />
           <Route path="*" element={<NotFound />} />

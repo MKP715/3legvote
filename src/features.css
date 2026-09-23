@@ -861,7 +861,10 @@ button.mini,
 /* The projector cannot scroll: the content scales down to fit the screen. */
 .display-fit {
   transform-origin: top center;
+  /* Zooming lays the screen out in a narrower canvas and scales it back up to the
+     wall, so bigger text never runs off the sides. */
   width: 100%;
+  margin: 0 auto;
 }
 .display-fitbox {
   overflow: hidden;
@@ -879,4 +882,735 @@ button.mini,
     border-radius: var(--pico-border-radius) !important;
     border-left-width: 1px !important;
   }
+}
+
+
+/* ================================================================
+   Agenda, motions, Conference items, badges and the extra
+   projector screens.
+   ================================================================ */
+
+/* ---- agenda runner ---- */
+.agenda-table {
+  width: 100%;
+}
+.agenda-table td {
+  vertical-align: top;
+}
+.agenda-table .agenda-title {
+  font-weight: 600;
+  margin: 0;
+  width: 100%;
+}
+.agenda-table .agenda-kind {
+  margin-right: 0.35rem;
+}
+.agenda-table select,
+.agenda-table input {
+  margin-bottom: 0.2rem;
+}
+.agenda-table .row.sub select,
+.agenda-table .row.sub input {
+  font-size: 0.8rem;
+  padding: 0.15rem 0.4rem;
+  height: auto;
+  width: auto;
+}
+.agenda-table tr.row-running {
+  background: var(--ok-bg);
+}
+.agenda-table tr.row-done {
+  opacity: 0.65;
+}
+.over {
+  color: var(--bad);
+}
+.under {
+  color: var(--ok);
+}
+
+/* ---- motions ---- */
+.motion-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.motion-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.motion-list li.current {
+  background: var(--pico-code-background-color);
+  border-radius: 4px;
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.link-btn:hover {
+  color: var(--pico-primary);
+}
+.motion-text {
+  border-left: 3px solid var(--pico-primary);
+  padding: 0.3rem 0 0.3rem 0.7rem;
+  margin: 0.4rem 0;
+  font-size: 1.05rem;
+}
+.debate {
+  margin: 0.6rem 0;
+}
+.speaker-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 999px;
+}
+.speaker-counter button {
+  width: 1.9rem;
+  padding: 0 0.3rem;
+  margin: 0;
+}
+.minority {
+  border-left: 4px solid var(--warn);
+}
+.vote-panel {
+  margin-top: 0.6rem;
+}
+.preview-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0;
+}
+.strong {
+  font-weight: 700;
+}
+
+/* ---- Conference agenda items ---- */
+.conf-group h4 {
+  margin: 0.6rem 0 0.2rem;
+  font-size: 0.95rem;
+  color: var(--pico-muted-color);
+}
+.conf-detail .sense {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.conf-result {
+  margin-top: 0.6rem;
+}
+.entry-table tr.row-lead {
+  background: var(--ok-bg);
+}
+.options-editor,
+.links-editor {
+  margin: 0.6rem 0;
+}
+.chip-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.chip-list .chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+}
+.chip-list .chip input[type='text'] {
+  margin: 0;
+  padding: 0.1rem 0.3rem;
+  height: auto;
+  width: 11rem;
+  font-size: 0.85rem;
+  border: none;
+  background: none;
+}
+.chip-list .chip .inline-field {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.chip-list .chip button {
+  padding: 0 0.35rem;
+  margin: 0;
+}
+.link-cards {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.link-cards li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 6px;
+  padding: 0.4rem;
+  max-width: 22rem;
+}
+.break {
+  overflow-wrap: anywhere;
+}
+.link-rows {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0;
+}
+.link-rows li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.3rem;
+  flex-wrap: wrap;
+}
+.link-rows li input[type='text'] {
+  width: 10rem;
+}
+.link-rows li input[type='url'] {
+  flex: 1 1 14rem;
+}
+.link-rows li input {
+  margin: 0;
+}
+
+/* ---- registration extras on the roll ---- */
+.reg-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-width: 16rem;
+}
+.chip-toggle {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--pico-muted-border-color);
+  background: none;
+  color: var(--pico-muted-color);
+  width: auto;
+  margin: 0;
+}
+.chip-toggle.on {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: var(--ok);
+  font-weight: 600;
+}
+.reg-field {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.3rem;
+  height: auto;
+  margin: 0;
+  width: 100%;
+}
+
+/* ---- projector controls ---- */
+.projector-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.projector-controls button {
+  margin: 0;
+}
+
+/* ================================================================
+   Extra projector screens
+   ================================================================ */
+.display-now {
+  text-align: center;
+  margin: 1.2rem 0;
+}
+.display-now .now-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 1rem;
+  color: var(--pico-muted-color);
+}
+.display-now .now-title {
+  font-size: 3.4rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.display-now .now-times {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-top: 0.4rem;
+}
+.display-next {
+  text-align: center;
+  font-size: 1.6rem;
+  margin-bottom: 0.8rem;
+}
+.display-next .next-label {
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  color: var(--pico-muted-color);
+  margin-right: 0.4rem;
+}
+.display-agenda {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  columns: 2;
+  column-gap: 2rem;
+  font-size: 1.25rem;
+}
+.display-agenda li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.12rem 0;
+  break-inside: avoid;
+}
+.display-agenda li.done {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.display-agenda li.current {
+  font-weight: 800;
+  color: var(--pico-primary);
+}
+.display-agenda .t {
+  width: 4.2rem;
+  color: var(--pico-muted-color);
+  font-variant-numeric: tabular-nums;
+}
+.display-agenda .n {
+  flex: 1;
+}
+.display-agenda .m {
+  color: var(--pico-muted-color);
+  font-size: 0.95rem;
+}
+
+.display-motion-text {
+  font-size: 2.2rem;
+  line-height: 1.25;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  border-left: 6px solid var(--pico-primary);
+  padding-left: 1rem;
+}
+.display-verdict {
+  text-align: center;
+  font-size: 4rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  margin: 0.6rem 0;
+}
+.display-verdict.carried {
+  color: var(--ok);
+}
+.display-verdict.defeated {
+  color: var(--bad);
+}
+.display-tally {
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  text-align: center;
+}
+.display-tally span {
+  display: block;
+  font-size: 1.1rem;
+  color: var(--pico-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.display-tally strong {
+  font-size: 3rem;
+  line-height: 1;
+}
+.display-bar {
+  position: relative;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: var(--pico-muted-border-color);
+  margin: 1rem 0 0.4rem;
+  overflow: hidden;
+}
+.display-bar .bar-yes {
+  height: 100%;
+  background: var(--ok);
+}
+.display-bar .bar-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--pico-color);
+}
+.display-background {
+  font-size: 1.4rem;
+  margin: 0.6rem 0;
+  color: var(--pico-muted-color);
+}
+.display-choices {
+  list-style: none;
+  padding: 0;
+  font-size: 2rem;
+  text-align: center;
+}
+.display-choices li {
+  padding: 0.3rem 0;
+}
+.display-results {
+  list-style: none;
+  padding: 0;
+  margin: 0.8rem 0;
+  font-size: 1.6rem;
+}
+.display-results li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.25rem 0;
+}
+.display-results .label {
+  width: 34%;
+}
+.display-results .track {
+  flex: 1;
+  height: 1.3rem;
+  background: var(--pico-muted-border-color);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.display-results .fill {
+  display: block;
+  height: 100%;
+  background: var(--pico-primary);
+}
+.display-results li.lead .fill {
+  background: var(--ok);
+}
+.display-results li.lead {
+  font-weight: 700;
+}
+.display-results .votes {
+  width: 7rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.display-sense {
+  text-align: center;
+  margin-top: 0.6rem;
+}
+.display-sense span {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pico-muted-color);
+  font-size: 1rem;
+}
+.display-sense strong {
+  font-size: 2.2rem;
+}
+.display-guidance {
+  margin-top: 1rem;
+  font-size: 1.2rem;
+  color: var(--pico-muted-color);
+  text-align: center;
+}
+.display-msg.small {
+  font-size: 1.4rem;
+}
+
+/* High-contrast projector theme for a washed-out screen or a bright hall. */
+.display-hc {
+  background: #000;
+  color: #fff;
+  --pico-color: #fff;
+  --pico-muted-color: #e5e5e5;
+  --pico-muted-border-color: #555;
+  --pico-primary: #ffe14d;
+  --pico-code-background-color: #111;
+  --ok: #4ade80;
+  --ok-bg: #052e16;
+  --warn: #fde047;
+  --warn-bg: #3b2f00;
+  --bad: #fca5a5;
+  --bad-bg: #450a0a;
+}
+.display-hc .display-clock,
+.display-hc .display-assembly,
+.display-hc small,
+.display-hc .muted {
+  color: #e5e5e5;
+}
+.display-hc .display-strip .strip-item {
+  border-color: #666;
+}
+
+/* ================================================================
+   Name badges
+   ================================================================ */
+.nb-preview {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.nb {
+  border: 1px solid var(--pico-muted-border-color);
+  border-top: 5px solid var(--nb-accent, #1d4ed8);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  background: var(--pico-card-background-color);
+  width: 100%;
+  max-width: 21rem;
+  min-height: 11rem;
+  overflow: hidden;
+}
+.nb-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--pico-muted-color);
+}
+.nb-logo {
+  max-height: 1.6rem;
+  max-width: 4rem;
+  object-fit: contain;
+}
+.nb-title {
+  font-weight: 700;
+  color: var(--nb-accent, #1d4ed8);
+}
+.nb-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.nb-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.nb-role {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.nb-where {
+  font-size: 0.78rem;
+  color: var(--pico-muted-color);
+}
+.nb-extra {
+  font-size: 0.72rem;
+  margin-top: 0.2rem;
+}
+.nb-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+}
+.nb-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--nb-accent, #1d4ed8);
+  color: var(--nb-accent, #1d4ed8);
+}
+.nb-qr {
+  width: 84px;
+  height: 84px;
+  background: #fff;
+  padding: 3px;
+  border-radius: 3px;
+}
+.nb-band {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 0.15rem;
+  border-radius: 3px;
+  margin-top: auto;
+}
+.nb-band.votes {
+  background: var(--ok);
+  color: #fff;
+}
+.nb-band.alt {
+  background: var(--warn);
+  color: #000;
+}
+.nb-band.novote {
+  background: var(--pico-muted-border-color);
+  color: var(--pico-color);
+}
+.nb-back-name {
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
+}
+.nb-back-heading {
+  font-weight: 700;
+  color: var(--nb-accent, #1d4ed8);
+}
+.nb-back-text {
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+.nb-agenda {
+  list-style: none;
+  padding: 0;
+  margin: 0.2rem 0;
+  font-size: 0.68rem;
+}
+.nb-agenda .t {
+  color: var(--pico-muted-color);
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.3rem;
+}
+.nb-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+.nb-link {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  font-size: 0.7rem;
+}
+.nb-link-qr {
+  width: 52px;
+  height: 52px;
+  background: #fff;
+}
+.nb-url {
+  color: var(--pico-muted-color);
+  overflow-wrap: anywhere;
+}
+.nb-sheets {
+  display: none;
+}
+.print-only {
+  display: none;
+}
+
+@media print {
+  .nb-sheets {
+    display: block;
+  }
+  .nb-page {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    break-after: page;
+  }
+  .nb-page:last-child {
+    break-after: auto;
+  }
+  .nb-sheets[data-per-page='4'] .nb-page {
+    grid-auto-rows: 5in;
+  }
+  .nb-sheets[data-per-page='6'] .nb-page {
+    grid-auto-rows: 3.33in;
+  }
+  .nb-sheets[data-per-page='8'] .nb-page {
+    grid-auto-rows: 2.5in;
+  }
+  .nb {
+    border: 1px dashed #999;
+    border-top: 4px solid var(--nb-accent, #1d4ed8);
+    border-radius: 0;
+    background: #fff;
+    color: #000;
+    max-width: none;
+    min-height: 0;
+    height: 100%;
+    padding: 0.18in;
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .nb-empty {
+    border: 1px dashed #ddd;
+    border-top: 1px dashed #ddd;
+  }
+  .nb-name {
+    font-size: 17pt;
+  }
+  .nb-sheets[data-per-page='4'] .nb-name {
+    font-size: 26pt;
+  }
+  .nb-where,
+  .nb-back-text {
+    color: #444;
+  }
+}
+
+/* ---- the printed report: new sections ---- */
+.report-motion,
+.report-conf-item {
+  break-inside: avoid;
+  margin-bottom: 0.8rem;
+}
+.report-motion h4,
+.report-conf-item h4 {
+  margin-bottom: 0.15rem;
+}
+
+/* On a phone the record's tables scroll inside their section instead of
+   pushing the whole page sideways. Printing is untouched. */
+@media screen and (max-width: 720px) {
+  .report section {
+    overflow-x: auto;
+  }
+  .report table {
+    min-width: 30rem;
+  }
+}
+
+/* A short projector screen sits in the middle of the wall, not at the top of it. */
+.display-centred {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.display-roundlabel {
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pico-muted-color);
+  font-size: 1.2rem;
+  margin-top: 0.8rem;
 }

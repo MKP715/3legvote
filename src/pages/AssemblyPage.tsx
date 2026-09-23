@@ -78,6 +78,18 @@ export function AssemblyPage() {
           <Link role="button" className="outline" to={`/a/${a.id}/checkin`}>
             Check-in desk
           </Link>
+          <Link role="button" className="outline" to={`/a/${a.id}/badges`}>
+            Name badges
+          </Link>
+          <Link role="button" className="outline" to={`/a/${a.id}/agenda`}>
+            Agenda{a.agenda.length ? ` (${a.agenda.length})` : ''}
+          </Link>
+          <Link role="button" className="outline" to={`/a/${a.id}/motions`}>
+            Motions{a.motions.length ? ` (${a.motions.length})` : ''}
+          </Link>
+          <Link role="button" className="outline" to={`/a/${a.id}/conference`}>
+            Conference items{a.conferenceItems.length ? ` (${a.conferenceItems.length})` : ''}
+          </Link>
           <Link role="button" className="outline" to={`/a/${a.id}/ballots`}>
             Print
           </Link>
