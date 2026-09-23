@@ -112,7 +112,8 @@ The Service Manual leaves some details open. You can set these per election, and
 ```bash
 npm install
 npm run dev        # dev server (src/ is the Vite root)
-npm test           # Vitest: 85 tests — rules engine, eligibility, poll import, teller codes, store
+npm test           # Vitest: 132 tests — rules engine, motions and polling, eligibility, poll import,
+                   #   teller codes, store, backup, translations and hydration of older saves
 npm run build      # type-check + build + publish the site to the repository root
 ```
 
@@ -125,13 +126,21 @@ Main modules:
 | File | What it does |
 |---|---|
 | [`src/engine/thirdLegacy.ts`](src/engine/thirdLegacy.ts) | Pure rules engine: replays ballots, withdrawals, motions and draws to work out every result |
+| [`src/engine/business.ts`](src/engine/business.ts) | Motions (Appendix W), Conference item polling and agenda timing |
 | [`src/engine/voters.ts`](src/engine/voters.ts) | Eligibility, alternates, one-person-one-vote, trustee balance |
 | [`src/engine/pollImport.ts`](src/engine/pollImport.ts) | Virtual poll CSV import |
-| [`src/engine/tellerCodes.ts`](src/engine/tellerCodes.ts) | Teller setup/report codes |
-| [`src/i18n.ts`](src/i18n.ts) | Announcements in English, Spanish and French |
+| [`src/engine/tellerCodes.ts`](src/engine/tellerCodes.ts) | Teller setup/report codes, and the check-in QR payload |
+| [`src/i18n.ts`](src/i18n.ts) | Announcements and the projector in English, Spanish and French |
+| [`src/reportI18n.ts`](src/reportI18n.ts) | The printed record in English, Spanish and French |
+| [`src/agendaTemplates.ts`](src/agendaTemplates.ts) | Sample assembly agendas (Appendix D) |
+| [`src/backup.ts`](src/backup.ts) | Automatic backup to a folder you choose |
 | [`src/store.ts`](src/store.ts) | State, persistence and the audit log |
 
-Built with open-source libraries: React, React Router, Zustand + Immer, Chart.js + chartjs-plugin-annotation, Pico CSS, Papa Parse, FileSaver.js, nanoid, qrcode, jsQR, vite-plugin-pwa (Workbox), Vite, and Vitest.
+Anything saved by an earlier version is brought up to date on every hydration
+(`assemblyFromStorage` in `src/store.ts`), so adding a field to `Assembly` cannot break
+elections people already have saved. Add its default to `newAssembly` and `normalizeAssembly`.
+
+Built with open-source libraries: React, React Router, Zustand + Immer, Chart.js + chartjs-plugin-annotation, Pico CSS, Papa Parse, FileSaver.js, nanoid, qrcode, jsQR, idb-keyval, vite-plugin-pwa (Workbox), Vite, and Vitest.
 
 ## Disclaimer
 

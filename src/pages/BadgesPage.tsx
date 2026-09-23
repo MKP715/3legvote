@@ -6,17 +6,12 @@ import { useAssembly, useStore } from '../store';
 import { CHANNEL_LABEL, type Assembly, type BadgeDesign, type BadgeLink, type Voter } from '../engine/types';
 import { encodeCheckin } from '../engine/tellerCodes';
 import { AGENDA_KIND_ICON } from '../agendaTemplates';
+import { BADGE_LAYOUT, fillPage, mirrorForDuplex, paginate } from '../badgeLayout';
 import { addMinutes } from '../engine/business';
 import { notify } from '../components/ui';
 import { NotFound } from './NotFound';
 
 type Who = 'all' | 'present' | 'voting' | 'attending';
-
-const LAYOUT: Record<BadgeDesign['perPage'], { cols: number; rows: number; label: string }> = {
-  4: { cols: 2, rows: 2, label: '4 per page (big, 4.25 × 5.5 in)' },
-  6: { cols: 2, rows: 3, label: '6 per page (4.25 × 3.67 in)' },
-  8: { cols: 2, rows: 4, label: '8 per page (4.25 × 2.75 in)' },
-};
 
 /**
  * Name badges for the assembly: designed once, saved with the assembly, and printed
@@ -51,8 +46,7 @@ export function BadgesPage() {
   const patchBack = (patch: Partial<BadgeDesign['back']>) => s.updateBadge(a.id, { back: { ...b.back, ...patch } });
 
   const rows: (Voter | null)[] = [...voters, ...Array.from({ length: blanks }, () => null)];
-  const pages: (Voter | null)[][] = [];
-  for (let i = 0; i < rows.length; i += b.perPage) pages.push(rows.slice(i, i + b.perPage));
+  const pages = paginate(rows, b.perPage);
 
   const onLogo = async (file: File | undefined) => {
     if (!file) return;
@@ -147,9 +141,9 @@ export function BadgesPage() {
               <label>
                 Badges per sheet
                 <select value={b.perPage} onChange={(e) => s.updateBadge(a.id, { perPage: Number(e.target.value) as BadgeDesign['perPage'] })}>
-                  {(Object.keys(LAYOUT) as unknown as BadgeDesign['perPage'][]).map((n) => (
+                  {(Object.keys(BADGE_LAYOUT) as unknown as BadgeDesign['perPage'][]).map((n) => (
                     <option key={n} value={n}>
-                      {LAYOUT[n].label}
+                      {BADGE_LAYOUT[n].label}
                     </option>
                   ))}
                 </select>
@@ -303,13 +297,13 @@ export function BadgesPage() {
               {page.map((v, j) => (
                 <BadgeFace key={v?.id ?? `blank-${j}`} assembly={a} voter={v} code={v ? codes[v.id] : undefined} />
               ))}
-              {padding(page.length, b.perPage).map((k) => (
+              {Array.from({ length: Math.max(0, b.perPage - page.length) }, (_, k) => (
                 <div className="nb nb-empty" key={`pad${k}`} />
               ))}
             </section>
             {b.doubleSided && (
               <section className="nb-page">
-                {mirror(fill(page, b.perPage), LAYOUT[b.perPage].cols, b.duplexFlip).map((v, j) => (
+                {mirrorForDuplex(fillPage(page, b.perPage), BADGE_LAYOUT[b.perPage].cols, b.duplexFlip).map((v, j) => (
                   <BadgeBack key={`b${v?.id ?? j}`} assembly={a} voter={v} />
                 ))}
               </section>
@@ -322,21 +316,6 @@ export function BadgesPage() {
 }
 
 /* ------------------------------------------------------------------ */
-
-const padding = (used: number, perPage: number) => Array.from({ length: Math.max(0, perPage - used) }, (_, i) => i);
-const fill = (page: (Voter | null)[], perPage: number): (Voter | null)[] => [...page, ...Array.from({ length: perPage - page.length }, () => null)];
-
-/**
- * Re-orders the backs so each one lands behind its own front. A printer that turns the
- * paper on the long edge mirrors left to right; one that turns it on the short edge
- * mirrors top to bottom.
- */
-function mirror<T>(cells: T[], cols: number, flip: 'long' | 'short'): T[] {
-  const rows: T[][] = [];
-  for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
-  const out = flip === 'long' ? rows.map((r) => [...r].reverse()) : [...rows].reverse();
-  return out.flat();
-}
 
 /** Check-in QR codes, generated locally; no name or email is encoded. */
 function useCheckinCodes(assemblyId: string, voters: Voter[]): Record<string, string> {
