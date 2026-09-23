@@ -1046,6 +1046,12 @@ export const useStore = create<Store>()(
           mutate(aid, (a) => {
             const m = a.motions.find((x) => x.id === mid);
             if (!m) return;
+            // Taken from the table: the vote that tabled it no longer governs, so undoing a
+            // later vote cannot put the motion back on the table.
+            if (status === 'open' && m.status === 'tabled') {
+              const tabled = [...m.rounds].reverse().find((r) => r.kind === 'table' && r.carried && !r.spent);
+              if (tabled) tabled.spent = true;
+            }
             m.status = status;
             if (status !== 'open') m.decidedAt = now();
             if (note) m.notes = [m.notes, note].filter(Boolean).join('\n');
@@ -1095,6 +1101,7 @@ export const useStore = create<Store>()(
               m.status = 'open';
               m.decidedAt = undefined;
             } else if (round.kind === 'amend' && tally.carried && round.text) {
+              entry.previousText = m.text;
               m.text = round.text;
             }
             log(
@@ -1112,11 +1119,29 @@ export const useStore = create<Store>()(
             if (!m || !m.rounds.length) throw new ActionError('No vote has been recorded on this motion.');
             const removed = m.rounds.pop()!;
             if (removed.kind === 'reconsider' && removed.carried) m.reconsidered = false;
-            // Recompute the motion's standing from whatever votes remain.
-            const decisive = [...m.rounds].reverse().find((r) => r.kind === 'main' || r.kind === 'committee' || r.kind === 'floor');
-            const tabled = [...m.rounds].reverse().find((r) => r.kind === 'table' && r.carried);
-            m.status = tabled ? 'tabled' : decisive ? (decisive.carried ? 'carried' : 'defeated') : 'open';
-            m.decidedAt = decisive ? decisive.at : undefined;
+            // An amendment that carried had rewritten the motion; undoing it puts the words back.
+            if (removed.kind === 'amend' && removed.carried && removed.previousText !== undefined) m.text = removed.previousText;
+            // Recompute the motion's standing by replaying the votes that remain, in order.
+            if (m.status !== 'withdrawn') {
+              let status: Motion['status'] = 'open';
+              let decidedAt: string | undefined;
+              for (const r of m.rounds) {
+                if (r.kind === 'main' || r.kind === 'committee' || r.kind === 'floor') {
+                  status = r.carried ? 'carried' : 'defeated';
+                  decidedAt = r.at;
+                } else if (r.kind === 'table' && r.carried && !r.spent) {
+                  status = 'tabled';
+                } else if (r.kind === 'recommit' && r.carried) {
+                  status = 'recommitted';
+                  decidedAt = r.at;
+                } else if (r.kind === 'reconsider' && r.carried) {
+                  status = 'open';
+                  decidedAt = undefined;
+                }
+              }
+              m.status = status;
+              m.decidedAt = decidedAt;
+            }
             log(a, 'Motion vote undone', `${m.number}. ${m.title} — ${MOTION_RULES[removed.kind].label}`);
           }),
 

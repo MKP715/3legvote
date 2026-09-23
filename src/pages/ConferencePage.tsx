@@ -315,10 +315,13 @@ function OptionsEditor({
   label,
   options,
   onChange,
+  locked,
 }: {
   label: string;
   options: ConferenceOption[];
   onChange: (options: ConferenceOption[]) => void;
+  /** Choices that already hold votes: they can be reworded, but not taken away. */
+  locked?: Set<string>;
 }) {
   const [draft, setDraft] = useState('');
   return (
@@ -341,7 +344,8 @@ function OptionsEditor({
               className="outline danger mini"
               aria-label={`Remove ${o.label}`}
               onClick={() => onChange(options.filter((x) => x.id !== o.id))}
-              disabled={options.length <= 2}
+              disabled={options.length <= 2 || locked?.has(o.id)}
+              title={locked?.has(o.id) ? 'The assembly has already voted on this choice — undo the poll to remove it' : undefined}
             >
               ✕
             </button>
@@ -377,6 +381,14 @@ function ItemDetail({ assembly, item }: { assembly: Assembly; item: ConferenceIt
   const [linkDraft, setLinkDraft] = useState({ label: '', url: '' });
 
   const preview = useMemo(() => tallyConferenceItem(counts, abstain, item.options), [counts, abstain, item.options]);
+  // A choice that has votes recorded against it cannot be removed, or those votes would
+  // vanish from the result without trace.
+  const voted = useMemo(() => {
+    const ids = new Set<string>();
+    for (const r of item.rounds)
+      for (const ch of CHANNELS) for (const [id, n] of Object.entries(r.counts[ch] ?? {})) if (n > 0) ids.add(id);
+    return ids;
+  }, [item.rounds]);
   const last = item.rounds[item.rounds.length - 1] ?? null;
   const result = last ? tallyConferenceItem(last.counts, last.abstain, item.options) : null;
 
@@ -544,6 +556,7 @@ function ItemDetail({ assembly, item }: { assembly: Assembly; item: ConferenceIt
         label="Choices the assembly is polled on"
         options={item.options}
         onChange={(options) => s.updateConferenceItem(a.id, item.id, { options })}
+        locked={voted}
       />
 
       {/* ---- the poll ---- */}

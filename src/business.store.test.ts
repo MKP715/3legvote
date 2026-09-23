@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useStore } from './store';
-import type { Assembly, Channel, MotionVoteCount } from './engine/types';
-import { tallyConferenceItem } from './engine/business';
+import type { Assembly, Channel, MotionKind, MotionVoteCount, VoteThreshold } from './engine/types';
+import { MOTION_RULES, tallyConferenceItem } from './engine/business';
 
 const S = () => useStore.getState();
 const A = (id: string): Assembly => S().assemblies.find((a) => a.id === id)!;
@@ -9,6 +9,25 @@ const hands = (yes: number, no: number, abstain = 0): Record<Channel, MotionVote
   inPerson: { yes, no, abstain },
   virtual: { yes: 0, no: 0, abstain: 0 },
 });
+const M = (aid: string, mid: string) => A(aid).motions.find((m) => m.id === mid)!;
+/** A vote on one motion, with only the parts a test cares about spelled out. */
+const vote = (
+  aid: string,
+  mid: string,
+  kind: MotionKind,
+  counts: Record<Channel, MotionVoteCount>,
+  extra: { text?: string; threshold?: VoteThreshold } = {},
+) =>
+  S().recordMotionVote(aid, mid, {
+    kind,
+    label: MOTION_RULES[kind].label,
+    text: extra.text,
+    movedBy: '',
+    secondedBy: '',
+    threshold: extra.threshold ?? MOTION_RULES[kind].threshold,
+    method: 'hands',
+    counts,
+  });
 
 describe('motions', () => {
   beforeEach(() => useStore.setState({ assemblies: [] }));
@@ -113,6 +132,61 @@ describe('motions', () => {
     expect(round.carried).toBe(false);
     expect(A(aid).motions[0].status).toBe('defeated');
     expect(A(aid).log.some((l) => (l.detail ?? '').includes('quorum not met'))).toBe(true);
+  });
+
+  it('puts the wording back when a carried amendment is undone', () => {
+    const aid = S().createAssembly('Undo');
+    const mid = S().addMotion(aid, { title: 'Budget', text: 'That the area spend $1,200.' });
+    vote(aid, mid, 'amend', hands(20, 2), { text: 'That the area spend $1,500.' });
+    expect(M(aid, mid).text).toBe('That the area spend $1,500.');
+
+    S().undoMotionVote(aid, mid);
+    expect(M(aid, mid).text).toBe('That the area spend $1,200.');
+    expect(M(aid, mid).rounds).toHaveLength(0);
+    expect(M(aid, mid).status).toBe('open');
+  });
+
+  it('leaves the wording alone when the amendment was defeated', () => {
+    const aid = S().createAssembly('Undo');
+    const mid = S().addMotion(aid, { title: 'Budget', text: 'That the area spend $1,200.' });
+    vote(aid, mid, 'amend', hands(5, 20), { text: 'That the area spend $1,500.' });
+    expect(M(aid, mid).text).toBe('That the area spend $1,200.');
+    S().undoMotionVote(aid, mid);
+    expect(M(aid, mid).text).toBe('That the area spend $1,200.');
+  });
+
+  it('does not put a motion back on the table after it was taken from it', () => {
+    const aid = S().createAssembly('Undo');
+    const mid = S().addMotion(aid, { title: 'Budget', text: 'That the area spend $1,200.' });
+    vote(aid, mid, 'table', hands(20, 5));
+    expect(M(aid, mid).status).toBe('tabled');
+
+    S().setMotionStatus(aid, mid, 'open', 'Taken from the table');
+    vote(aid, mid, 'main', hands(10, 12));
+    expect(M(aid, mid).status).toBe('defeated');
+
+    S().undoMotionVote(aid, mid);
+    expect(M(aid, mid).status).toBe('open');
+  });
+
+  it('restores a recommittal when a later vote is undone', () => {
+    const aid = S().createAssembly('Undo');
+    const mid = S().addMotion(aid, { title: 'Budget', text: 'That the area spend $1,200.' });
+    vote(aid, mid, 'recommit', hands(22, 3));
+    expect(M(aid, mid).status).toBe('recommitted');
+
+    vote(aid, mid, 'amend', hands(4, 20), { text: 'That the area spend $900.' });
+    S().undoMotionVote(aid, mid);
+    expect(M(aid, mid).status).toBe('recommitted');
+  });
+
+  it('keeps a withdrawn motion withdrawn when a vote is undone', () => {
+    const aid = S().createAssembly('Undo');
+    const mid = S().addMotion(aid, { title: 'Budget', text: 'That the area spend $1,200.' });
+    vote(aid, mid, 'amend', hands(4, 20), { text: 'That the area spend $1,500.' });
+    S().setMotionStatus(aid, mid, 'withdrawn');
+    S().undoMotionVote(aid, mid);
+    expect(M(aid, mid).status).toBe('withdrawn');
   });
 
   it('numbers motions and refuses to delete one that has been voted on', () => {

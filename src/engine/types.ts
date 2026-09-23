@@ -292,6 +292,10 @@ export interface MotionRound {
   eligible: number;
   at: string;
   note?: string;
+  /** The wording this vote replaced, so undoing a carried amendment restores it. */
+  previousText?: string;
+  /** A carried motion to table, once the motion has been taken from the table again. */
+  spent?: boolean;
   /** The side that did not prevail is invited to speak (Appendix W). */
   minority?: { heard: boolean; side: 'for' | 'against'; notes: string };
 }
